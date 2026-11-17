@@ -13,6 +13,7 @@ the profile instead of naming a game, so the same code serves any game with its 
 | `plugin` | The Kotlin object (implements `GamePlugin`) with the game's own macro steps; it ships in the logic pack |
 | `safety.purchase_words` | Words that mean an offer to pay: never tapped |
 | `safety.premium_words` | Words that mean premium currency: taps there need the user's OK |
+| `safety.reward_words` | Optional. Words that show the premium currency on screen is a reward being received (a commercial's reward, a login bonus): with one on screen, `premium_words` don't ask. Purchase words and irreversible buttons still do |
 | `groups` | The macro groups in tab order: `id` (a macro's `group:` and its folder in `macros/`), `title`, `icon` (`res/drawable/ic_<icon>.xml`) |
 | `plugin_steps` | The plugin's steps that describe themselves in the app's "How it works": a macro using one needs no `how:` list (checked by `tools/macroforge_pack.py`) |
 | `pack.common`, `pack.folders` | Where the macro pack takes its templates from: the shared folder (default `templates/common`) and the folder of template folders (default `folders`, each `<name>/templates/` plus its `.yaml` data) |

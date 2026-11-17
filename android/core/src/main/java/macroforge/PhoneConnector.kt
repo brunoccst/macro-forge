@@ -35,8 +35,11 @@ object PhoneConnector {
     private fun changed() { listeners.forEach { runCatching { it() } } }
 
     private const val IDLE_OFF_MS = 30 * 60_000L
-    /** Claude's connector tool calls time out after 240 s; answer before that. */
-    private const val CONFIRM_TIMEOUT_MS = 2 * 60_000L
+    /**
+     * Claude's connector tool calls time out after 60 s (claude.ai): answer before that, so the tap
+     * returns "moved to a notification" instead of timing out with an unknown outcome.
+     */
+    private const val CONFIRM_TIMEOUT_MS = 45_000L
     private const val SHOT_MAX = 1024
     private const val JPEG_QUALITY = 70
     /** The screen stays on this long after Claude's last tool call (then it may time out as usual). */
