@@ -21,14 +21,17 @@ A sidebar (≡ at the top left) switches between four pages, all in `MainActivit
 - **Macros** (`MacrosPage.kt`): a search box, tabs "In use" plus one per game.yaml group. Each
   macro has a switch to choose whether you use it. Tap a macro for "How it works" (with the
   macros it runs opened up, `MacroSteps.kt`), its options and **Select this macro**: the
-  floating buttons start, pause and stop it. Options are kept per macro (`MacroParams`).
+  floating buttons start, pause and stop it. Options are kept per macro (`MacroParams`) and save
+  as soon as they change; only the changed ones are saved, so the rest keep following their
+  defaults, the inner macro they come from and the global parameters (Select only makes the
+  macro the one the floating ▶ starts).
 - **Statistics** (`StatsPage.kt`, data in `RunStats.kt`): every macro run on this phone
   (`files/stats/runs.jsonl`: start, end, stop reason, counters, who started it, the routine it
   was a step of, and the run reports written to `runs.log`, shown as game.yaml `reports:` says).
   Totals, runs and minutes per day, time by macro; per macro its totals, run lengths, stop
   reasons, items and rewards read. "Clear" removes all statistics or one macro's.
 - **System** (`SystemPage.kt`), in tabs: Setup (taps, screen capture), Claude (the phone
-  connector and what Claude may do), Settings, Updates and Log.
+  connector and what Claude may do), Settings (with the Global parameters, `Globals.kt`), Updates and Log.
 
 From adb: `am start -n <application_id>/macroforge.MainActivity --es page macros`, or
 `--es run <macro> --es params "name=value"` to start a macro; `adb logcat -s MacroForge` for

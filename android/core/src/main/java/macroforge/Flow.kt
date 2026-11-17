@@ -55,10 +55,12 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
     val ownParams: Map<String, Param> = map(spec["params"]).entries.associate { (k, v) ->
         val m = mapOrNull(v)
         val choices = list(m?.get("choices")).map { Expr.str(it) }
-        val default = m?.get("default") ?: v
+        // an option that follows a global parameter starts as "global" unless it says otherwise
+        val global = m?.get("global")?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+        val default = m?.get("default") ?: if (m != null && global != null) Globals.VALUE else v
         val type = m?.get("type")?.toString() ?: if (default is Boolean) "bool" else "text"
         k.toString() to Param(Expr.str(default), m?.get("help")?.toString() ?: "", choices, type, m?.get("show_if")?.toString(),
-            beside = m?.get("beside")?.toString())
+            beside = m?.get("beside")?.toString(), global = global)
     }
     /**
      * The options taken over from the macros it runs (battle.skill_1, ...): set by [InnerParams.link]

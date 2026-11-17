@@ -69,3 +69,8 @@ reports:
     - {key: seconds, duration: true}
     - {key: coins, show: "coins {value}", total: Coins earned}
     - {key: rare_drop, show: rare drop, total: Rare drops, card: Rare drop}
+
+# global parameters (System → Settings → Global parameters): options many macros share, set once.
+# A macro option follows one with `global: <key>` (docs/game-profile.md), for example:
+# globals:
+#   team: {default: current, choices: [current, 1, 2, 3], help: "the team to use"}

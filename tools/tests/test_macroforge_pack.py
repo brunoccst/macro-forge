@@ -52,3 +52,15 @@ def test_runs_unknown_macro(tmp_path):
     (tmp_path / "macros" / "basic").mkdir(parents=True)
     (tmp_path / "macros" / "basic" / "a.yaml").write_text("name: a\ngroup: basic\nhow: [x]\nunknown: [{run: nope}]\n")
     assert any("runs unknown macro 'nope'" in p for p in mp.check(tmp_path))
+
+
+def test_options_follow_known_globals(tmp_path):
+    _game(tmp_path, globals={"team": {"default": "current", "choices": ["current", 1, 2]},
+                             "bad": {"default": 9, "choices": [1, 2]}})
+    (tmp_path / "macros" / "daily").mkdir(parents=True)
+    (tmp_path / "macros" / "daily" / "x.yaml").write_text(
+        "name: x\ngroup: daily\nhow: [Go]\nparams:\n  team: {global: team}\n  speed: {global: speed}\nunknown: [{wait: 1}]\n")
+    problems = mp.check(tmp_path)
+    assert any("unknown global 'speed'" in p for p in problems)
+    assert not any("'team'" in p for p in problems)
+    assert any("global 'bad': default" in p for p in problems)

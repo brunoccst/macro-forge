@@ -50,6 +50,9 @@ params:                               # its own options (the inner macros' come 
   # option kinds: choices: [...] = pills; type: bool = switch (show_if: <switch> hides an option
   # while that switch is off; beside: <option> draws the switch on the side of that option's box);
   # type: number = number box; anything else = text box
+  # global: <key> = the option follows that global parameter (game.yaml globals:, set on
+  # System → Settings → Global parameters): it gets a "Global" choice, its default unless it gives
+  # another one, and while set to it the run uses the global's value
 screens: [shop, home]                 # priority order: specific screens first
 define_screens:
   my_screen: {require: [my_template], reject: [other_template]}

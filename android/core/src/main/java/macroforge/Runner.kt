@@ -27,7 +27,12 @@ data class Param(val default: String, val help: String, val choices: List<String
                   * A switch drawn on the side of another option's box instead of on its own row
                   * (e.g. all_keys next to runs); while it is on, that box is greyed out.
                   */
-                 val beside: String? = null) {
+                 val beside: String? = null,
+                 /**
+                  * The global parameter (System → Settings → Global parameters, see [Globals]) this
+                  * option follows while it is set to [Globals.VALUE] ("global"), e.g. skill_1.
+                  */
+                 val global: String? = null) {
     val isBool get() = type == "bool"
     val isNumber get() = type == "number"
     /** Its key in the macro it comes from (skill_1 for battle.skill_1). */
@@ -448,10 +453,11 @@ object Runner {
     /**
      * The params a run uses: the macro's defaults, then [given] (only names it has). Options taken
      * over from the macros it runs (battle.skill_1, see [InnerParams]) get no default here: unset,
-     * the inner macro runs with its own.
+     * the inner macro runs with its own. An option set to "global" takes its global parameter's
+     * value ([Globals]).
      */
-    fun resolve(scenario: Scenario, given: Map<String, String>) =
-        scenario.params.filterValues { it.from == null }.mapValues { it.value.default } + given.filterKeys { it in scenario.params }
+    fun resolve(scenario: Scenario, given: Map<String, String>) = Globals.fill(scenario.params,
+        scenario.params.filterValues { it.from == null }.mapValues { it.value.default } + given.filterKeys { it in scenario.params })
 
     private fun library(scenario: Scenario, files: LibraryFiles, userTemplates: java.io.File?): Library {
         val library = Library.load(files, "templates/common", *scenario.templateFolders.map { "templates/$it" }.toTypedArray())
@@ -481,6 +487,7 @@ object Runner {
         changed()
         val files = MacroLibrary.files(app)
         val userTemplates = Scenarios.userTemplates(app)
+        Globals.init(app)
         val params = resolve(scenario, given)
         val ctx = Context(capture, files, Vision(library(scenario, files, userTemplates)), params, stopRequested)
         ctx.debugDir = java.io.File(app.filesDir, "debug").apply { mkdirs() }

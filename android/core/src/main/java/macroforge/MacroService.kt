@@ -97,7 +97,7 @@ class MacroService : Service() {
             val w = worker
             if (w != null && w.isAlive) w.join(15000)
             val last = LastRun.load(this) ?: run { MacroLog.i("nothing to restart yet"); return@Thread }
-            startService(LastRun.intent(this, last.first, last.second))
+            startService(LastRun.intent(this, last.first, MacroParams.load(this, last.first)))
         }.start()
     }
 

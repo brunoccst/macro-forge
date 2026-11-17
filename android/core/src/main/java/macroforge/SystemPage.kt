@@ -157,6 +157,10 @@ class SystemPage(private val a: MainActivity) {
             addView(Ui.text(a, "Floating buttons", 15f, bold = true))
             addView(Ui.text(a, "While screen capture is on: the selected macro (tap it to pick another), ▶ start, ❚❚ pause, ■ stop, ↻ restart. Drag the round AM badge on top to move them, tap it to fold them.", 12.5f, Ui.MUTED))
         })
+        // the options many macros share (game.yaml globals:), drawn by drawGlobals
+        into.addView(globalsSection)
+        into.addView(globalsCard)
+        drawGlobals()
 
         // --- updates -----------------------------------------------------------------------
         into = tab("updates")
@@ -239,6 +243,65 @@ class SystemPage(private val a: MainActivity) {
         view = scroll
     }
 
+    private val globalsSection = Ui.section(a, "Global parameters")
+    private val globalsCard = Ui.card(a)
+
+    /**
+     * Global parameters ([Globals]): one row per global the game declares, saved as soon as it
+     * changes. Every macro option set to "global" (the default of the ones that follow a global)
+     * takes this value; a macro set to its own value keeps it.
+     */
+    private fun drawGlobals() {
+        val defs = Globals.defs(a)
+        globalsSection.visibility = if (defs.isEmpty()) View.GONE else View.VISIBLE
+        globalsCard.visibility = globalsSection.visibility
+        globalsCard.removeAllViews()
+        if (defs.isEmpty()) return
+        globalsCard.addView(Ui.text(a, "Options many macros share, set once here. Each macro's option starts as \"Global\" and follows this value; set it on the macro itself (Macros page) to give that macro its own.", 12.5f, Ui.MUTED)
+            .apply { setPadding(0, 0, 0, dp(4)) })
+        val saved = Globals.saved(a)
+        for ((key, p) in defs) {
+            globalsCard.addView(Ui.divider(a))
+            val value = saved[key] ?: p.default
+            if (p.isBool) {
+                globalsCard.addView(switchRow(Ui.title(key), p.help, FlowScenario.typed(value) == true) { on -> Globals.set(a, key, on.toString()) })
+                continue
+            }
+            globalsCard.addView(Ui.text(a, Ui.title(key), 15f, bold = true))
+            if (p.help.isNotBlank()) globalsCard.addView(Ui.text(a, p.help, 12.5f, Ui.MUTED))
+            if (p.choices.isEmpty()) {
+                globalsCard.addView(field(p.default).apply {
+                    setText(value)
+                    if (p.isNumber) inputType = InputType.TYPE_CLASS_NUMBER
+                    onChange { Globals.set(a, key, it) }
+                })
+                continue
+            }
+            // choices as a row of pills: tap one to pick it
+            var cur = value
+            val row = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(6), 0, 0) }
+            val pills = ArrayList<TextView>()
+            fun paint() = pills.forEach { t ->
+                val sel = t.tag == cur
+                t.setTextColor(if (sel) Ui.ON_ACCENT else Ui.TEXT)
+                t.background = if (sel) Ui.pressableBezel(a, 16) else Ui.pressable(a, Ui.CARD_ALT, 16)
+            }
+            for (o in if (value in p.choices) p.choices else p.choices + value) {
+                val t = Ui.text(a, o, 14f).apply {
+                    tag = o
+                    Ui.centered(this)
+                    minWidth = dp(44)
+                    setPadding(dp(14), dp(8), dp(14), dp(8))
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) }
+                    setOnClickListener { cur = o; paint(); Globals.set(a, key, o) }
+                }
+                pills += t; row.addView(t)
+            }
+            paint()
+            globalsCard.addView(android.widget.HorizontalScrollView(a).apply { isHorizontalScrollBarEnabled = false; addView(row) })
+        }
+    }
+
     /** Show the tab [id] (setup, claude, settings, updates, log). */
     fun showTab(id: String) {
         if (id !in tabs) return
@@ -270,6 +333,7 @@ class SystemPage(private val a: MainActivity) {
         PhoneConnector.listeners += connectorListener
         log.text = MacroLog.text()
         refreshConnector()
+        drawGlobals() // a new macro pack may bring other globals
         checkForUpdates(automatic = true)
         if (tab == "updates") loadBuilds(force = false)
         Updater.progressListeners += progressListener

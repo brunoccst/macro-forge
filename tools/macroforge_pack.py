@@ -179,6 +179,15 @@ def _check_game(profile: dict) -> list[str]:
     for g in profile.get("groups") or []:
         if not isinstance(g, dict) or not g.get("id") or not g.get("title"):
             problems.append(f"{GAME}: group {g!r} needs an id and a title")
+    globals_ = profile.get("globals") or {}
+    if not isinstance(globals_, dict):
+        problems.append(f"{GAME}: globals must be a map of options")
+    else:
+        for k, p in globals_.items():
+            if "." in str(k):
+                problems.append(f"{GAME}: global {k!r}: no dots in a global's name")
+            if isinstance(p, dict) and p.get("choices") and "default" in p and str(p["default"]) not in map(str, p["choices"]):
+                problems.append(f"{GAME}: global {k!r}: default {p['default']!r} is not one of its choices")
     return problems
 
 
@@ -188,6 +197,7 @@ def check(root: Path) -> list[str]:
     problems: list[str] = _check_game(profile)
     groups = {g.get("id") for g in profile.get("groups") or [] if isinstance(g, dict)}
     explained = {str(s) for s in profile.get("plugin_steps") or []}
+    globals_ = profile.get("globals") if isinstance(profile.get("globals"), dict) else {}
     all_macros = macros(root)
     folders = {p.split("/")[1] for p in pack_files(root) if p.startswith("templates/")}
     for name, (f, spec) in all_macros.items():
@@ -225,6 +235,9 @@ def check(root: Path) -> list[str]:
                     problems.append(f"{rel}: option {k!r} {ref} unknown option {p[ref]!r}")
             if "beside" in p and p.get("type") != "bool" and not isinstance(p.get("default"), bool):
                 problems.append(f"{rel}: option {k!r} has beside but is not a switch")
+            # global: names one of game.yaml's globals (the option follows it while set to "global")
+            if "global" in p and str(p["global"]) not in globals_:
+                problems.append(f"{rel}: option {k!r} follows unknown global {p['global']!r} (game.yaml globals:)")
         for u in used:
             if u not in all_macros:
                 problems.append(f"{rel}: runs unknown macro {u!r}")
