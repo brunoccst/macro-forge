@@ -44,6 +44,8 @@ class SystemPage(private val a: MainActivity) {
     private val connectorListener: () -> Unit = { a.runOnUiThread { refreshConnector() } }
     val view: View
     private val tabsRow = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL; setPadding(dp(16), dp(12), dp(16), dp(4)) }
+    /** Settings → Daily schedule: which macro (or routine) runs, picked from the installed ones. */
+    private lateinit var scheduleMacro: android.widget.Spinner
     // the Global parameters card on the Settings tab (drawGlobals)
     private val globalsSection = Ui.section(a, "Global parameters")
     private val globalsCard = Ui.card(a)
@@ -145,10 +147,14 @@ class SystemPage(private val a: MainActivity) {
                 "Runs a macro every day a few minutes after the game's daily reset (${DailySchedule.RESET_HOUR_UTC}:00 UTC), with its own saved options. Screen capture must be on; if it's off, a notification says the run was skipped.",
                 DailySchedule.enabled(a)) { on -> DailySchedule.setEnabled(a, on); showNext() })
             addView(Ui.text(a, "Macro to run", 13.5f, bold = true).apply { setPadding(0, dp(8), 0, 0) })
-            addView(field(DailySchedule.DEFAULT_MACRO).apply {
-                setText(DailySchedule.macro(a))
-                onChange { DailySchedule.setMacro(a, it) }
-            })
+            scheduleMacro = android.widget.Spinner(a, android.widget.Spinner.MODE_DROPDOWN).apply {
+                background = Ui.rounded(Ui.CARD_ALT, dp(12).toFloat())
+                setPopupBackgroundDrawable(Ui.rounded(Ui.CARD_ALT, dp(12).toFloat()))
+                setPadding(dp(4), dp(2), dp(4), dp(2))
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) }
+            }
+            addView(scheduleMacro)
+            drawScheduleChoices()
             addView(Ui.text(a, "Minutes after the reset", 13.5f, bold = true).apply { setPadding(0, dp(8), 0, 0) })
             addView(field(DailySchedule.DEFAULT_DELAY_MIN.toString()).apply {
                 inputType = InputType.TYPE_CLASS_NUMBER
@@ -335,6 +341,7 @@ class SystemPage(private val a: MainActivity) {
         log.text = MacroLog.text()
         refreshConnector()
         drawGlobals() // a new macro pack may bring other globals
+        drawScheduleChoices() // ... and other macros to schedule
         checkForUpdates(automatic = true)
         if (tab == "updates") loadBuilds(force = false)
         Updater.progressListeners += progressListener
@@ -583,6 +590,43 @@ class SystemPage(private val a: MainActivity) {
     private fun afterPick() {
         MacroLibrary.updateAsync(a, force = true)
         showBuilds(shownBuilds)
+    }
+
+    /**
+     * Fill the Daily schedule's macro list: every installed macro (routines too), grouped as on
+     * the Macros page. A saved name that isn't installed (yet) stays first, marked, so opening
+     * the page never changes what runs.
+     */
+    private fun drawScheduleChoices() {
+        if (!::scheduleMacro.isInitialized) return
+        val saved = DailySchedule.macro(a)
+        val groups = Groups.sort(runCatching { Scenarios.all(a) }.getOrDefault(emptyList()))
+        // (name, label shown, group heading shown in the open list)
+        val rows = ArrayList<Triple<String, String, String?>>()
+        if (groups.none { (_, list) -> list.any { it.name == saved } }) rows += Triple(saved, "$saved (not installed)", null)
+        for ((group, list) in groups) list.forEachIndexed { i, sc -> rows += Triple(sc.name, sc.name, if (i == 0) group.title else null) }
+        scheduleMacro.onItemSelectedListener = null
+        scheduleMacro.adapter = object : android.widget.BaseAdapter() {
+            override fun getCount() = rows.size
+            override fun getItem(i: Int) = rows[i].first
+            override fun getItemId(i: Int) = i.toLong()
+            override fun getView(i: Int, convert: View?, parent: android.view.ViewGroup?): View =
+                Ui.text(a, rows[i].second, 14.5f).apply { setPadding(dp(8), dp(10), dp(8), dp(10)); isSingleLine = true }
+            override fun getDropDownView(i: Int, convert: View?, parent: android.view.ViewGroup?): View = LinearLayout(a).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), 0, dp(12), 0)
+                rows[i].third?.let { addView(Ui.text(a, it, 11.5f, Ui.MUTED, bold = true).apply { setPadding(0, dp(10), 0, 0) }) }
+                addView(Ui.text(a, rows[i].second, 14.5f, if (rows[i].first == DailySchedule.macro(a)) Ui.ACCENT else Ui.TEXT)
+                    .apply { setPadding(dp(8), dp(10), 0, dp(10)); isSingleLine = true })
+            }
+        }
+        scheduleMacro.setSelection(rows.indexOfFirst { it.first == saved }.coerceAtLeast(0), false)
+        scheduleMacro.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, i: Int, id: Long) {
+                if (rows[i].first != DailySchedule.macro(a)) DailySchedule.setMacro(a, rows[i].first)
+            }
+            override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
+        }
     }
 
     // --- views -------------------------------------------------------------------------------
