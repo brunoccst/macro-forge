@@ -126,7 +126,14 @@ class Context(
         val bmp = colorBitmap() ?: return emptyList()
         // the live log overlay is on the screen capture too: never read our own words as the game's
         val own = LiveLog.area
-        return try { Ocr.read(bmp).filter { l -> own == null || !own.contains(l.center) } } finally { bmp.recycle() }
+        // so are the floating buttons (their badge reads as "AM"-like text): leave them out too
+        val buttons = InputService.instance?.controls()?.second
+        return try {
+            Ocr.read(bmp).filter { l ->
+                (own == null || !own.contains(l.center)) &&
+                    (buttons == null || !buttons.contains((l.center.x * bmp.width).toInt(), (l.center.y * bmp.height).toInt()))
+            }
+        } finally { bmp.recycle() }
     }
 
     /** Text in one part of the screen only (faster: a smaller image to read). */
