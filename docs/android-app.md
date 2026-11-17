@@ -79,7 +79,9 @@ user's relay, a small Cloudflare Worker on their own account ([relay/README.md](
 - **Signing:** one permanent key for every build, or Android refuses updates. Keep a backup.
 - **Workflows:** a game app calls this repo's reusable workflows instead of copying them:
   `app-build.yml` (tests, dev build, logic pack), `macro-pack.yml` (the `macros-<branch>` pack)
-  and `app-release.yml` (a release). Each file's header shows the calling job. Signing comes from
+  `app-release.yml` (a release) and `release-cleanup.yml` (deletes a branch's `dev-`/`macros-`
+  pre-releases and tags when its pull request closes; run by hand, it sweeps every branch without
+  an open pull request). Each file's header shows the calling job. Signing comes from
   the secrets `ANDROID_KEYSTORE_B64` (the .p12 key, base64) and `ANDROID_KEYSTORE_PASSWORD`.
 
 ## The macro library
