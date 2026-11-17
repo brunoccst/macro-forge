@@ -22,6 +22,8 @@ macro-forge is the generic part. A game app uses it and adds what is its own:
   can reach the phone as a custom connector (`relay/README.md`).
 - `tools/macroforge_pack.py`: checks a game's macros and builds the macro pack the app downloads
   (`python tools/macroforge_pack.py --root <game repo> -o macros.zip`).
+- `.claude/skills/capture-templates`: a Claude skill that captures missing screen templates from
+  the live phone through the connector.
 - `docs`: [the Android app](docs/android-app.md), [writing macros](docs/writing-macros.md),
   [the game profile](docs/game-profile.md) and [the logic pack](docs/logic-pack.md).
 - `starter/game.yaml` and `android/starter`: a made-up game ("Pocket Quest") and its app, with a
