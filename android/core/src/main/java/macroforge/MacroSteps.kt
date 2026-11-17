@@ -83,7 +83,7 @@ object MacroSteps {
         out.putAll(saved)
         out.putAll(InnerParams.scoped(outer, name))
         out.putAll(given)
-        return out
+        return Globals.fill(inner.params, out)
     }
 
     private fun how(v: Any?, env: Env, explain: (String, Any?, Env) -> List<Step>?): List<Step> = FlowScenario.list(v).flatMap { e ->

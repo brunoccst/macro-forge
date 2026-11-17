@@ -38,6 +38,21 @@ next macro pack. Without a pack copy the logic uses the app's own.
 | `relay_guide` | The web address of the relay setup guide the app links to (default: the repo's `relay/README.md`) |
 | `claude` | What Claude is told about the game: extra how-to lines, premium-currency examples, the example macro, a reward text example, extra macro-format lines |
 
+## Global parameters
+
+`globals:` lists options many macros share, set once on System → Settings → Global parameters
+(`Globals.kt`) instead of on one macro the others copy, for example the team to use or a skill
+per slot. Each is written like a macro option (`default`, `choices`, `help`, `type`). A macro
+option follows one with `global: <key>`: it gets a "Global" choice (shown with the global's
+value), which is its default unless it gives another, and while it is set to it the run uses the
+global's value. Any other value is that macro's own, so each macro keeps its own config. The
+macro pack's copy of game.yaml is read first, so a new global reaches the phone with the pack.
+
+```yaml
+globals:
+  team: {default: current, choices: [current, 1, 2, 3], help: "the team to use"}
+```
+
 ## Run reports
 
 Macros write one report per round to `files/runs.log` . The

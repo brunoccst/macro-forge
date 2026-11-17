@@ -404,13 +404,14 @@ class MacrosPage(private val a: MainActivity) {
 
     // --- the open macro ---------------------------------------------------------------------
 
-    /** Make [s] what the floating ▶ starts, with the options as set here. */
+    /**
+     * Make [s] what the floating ▶ starts. Its options aren't saved here: each one saves as soon
+     * as it changes ([optionChanged]), and every start reads them as saved.
+     */
     private fun select() {
         val s = scenario ?: return
         if (Runner.isRunning) { a.toast("Stop the running macro first (■ on the floating buttons)."); return }
-        val params = paramFields.mapValues { it.value() }
-        MacroParams.save(a, s.name, params)
-        LastRun.save(a, s.name, params)
+        LastRun.save(a, s.name, MacroParams.load(a, s.name))
         MacroChoice.setUsed(a, s.name, true)
         detailUse.isChecked = true
         Runner.changed() // the floating buttons show the new name
@@ -421,9 +422,9 @@ class MacrosPage(private val a: MainActivity) {
 
     private fun showSelected(s: Scenario) {
         val sel = LastRun.load(a)?.first == s.name
-        selectButton.text = if (sel) "✓  Selected: save these options" else "Select this macro"
-        selectHint.text = if (sel) "This is the macro the floating ▶ starts. Start, pause and stop it there, over the game."
-        else "The floating buttons over the game then start, pause and stop it."
+        selectButton.text = if (sel) "✓  Selected" else "Select this macro"
+        selectHint.text = if (sel) "This is the macro the floating ▶ starts. Start, pause and stop it there, over the game. Its options save as you change them."
+        else "The floating buttons over the game then start, pause and stop it. Its options save as you change them."
     }
 
     private fun drawStatsLink(s: Scenario) {
@@ -448,15 +449,25 @@ class MacrosPage(private val a: MainActivity) {
         if (show) drawDiagram()
     }
 
-    /** Redraw "How it works" when an option changes (its steps follow the options as set). */
-    private fun optionChanged() { if (diagramCard.visibility == View.VISIBLE) diagramCard.post { drawDiagram() } }
+    /**
+     * The option [key] of the open macro changed on the page: save it now (only the options the
+     * user changed are saved, so the others keep following their defaults, the macro they come
+     * from and the global parameters), and redraw "How it works" (its steps follow the options as set).
+     */
+    private fun optionChanged(key: String) {
+        val s = scenario
+        val value = paramFields[key]?.invoke()
+        // (a run that is going on keeps the options it started with)
+        if (s != null && value != null) MacroParams.save(a, s.name, MacroParams.load(a, s.name) + (key to value))
+        if (diagramCard.visibility == View.VISIBLE) diagramCard.post { drawDiagram() }
+    }
 
     /** The open macro's options as set now on the page (else as saved, else their defaults). */
     private fun currentOptions(s: Scenario): Map<String, String> {
         val last = MacroParams.load(a, s.name)
-        return s.params.entries.associate { (k, p) ->
+        return Globals.fill(s.params, s.params.entries.associate { (k, p) ->
             k to (paramFields[k]?.invoke() ?: last[k] ?: if (p.from != null) InnerParams.effective(k, p) { MacroParams.load(a, it) } else p.default)
-        }
+        })
     }
 
     /**
@@ -569,7 +580,7 @@ class MacrosPage(private val a: MainActivity) {
                 box.addView(switchRow(Ui.title(p.innerKey(key)), p.help, cur) { on ->
                     cur = on
                     dependents[key]?.forEach { it.visibility = if (on) View.VISIBLE else View.GONE }
-                    optionChanged()
+                    optionChanged(key)
                 })
                 paramFields[key] = { cur.toString() }
                 continue
@@ -577,7 +588,9 @@ class MacrosPage(private val a: MainActivity) {
             box.addView(Ui.text(a, Ui.title(p.innerKey(key)), 15f, bold = true))
             if (p.help.isNotBlank()) box.addView(Ui.text(a, p.help, 12.5f, Ui.MUTED))
             if (p.choices.isNotEmpty()) {
-                val options = if (value in p.choices) p.choices else p.choices + value
+                // an option that follows a global parameter: "global" first, shown with the global's value
+                val choices = if (p.global != null && Globals.VALUE !in p.choices) listOf(Globals.VALUE) + p.choices else p.choices
+                val options = if (value in choices) choices else choices + value
                 // choices as a row of pills: tap one to pick it
                 var cur = value
                 val row = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(6), 0, 0) }
@@ -588,13 +601,13 @@ class MacrosPage(private val a: MainActivity) {
                     t.background = if (sel) Ui.pressableBezel(a, 16) else Ui.pressable(a, Ui.CARD_ALT, 16)
                 }
                 for (o in options) {
-                    val t = Ui.text(a, o, 14f).apply {
+                    val t = Ui.text(a, if (o == Globals.VALUE && p.global != null) Globals.label(a, p) else o, 14f).apply {
                         tag = o
                         Ui.centered(this)
                         minWidth = dp(44)
                         setPadding(dp(14), dp(8), dp(14), dp(8))
                         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = dp(8) }
-                        setOnClickListener { cur = o; paint(); optionChanged() }
+                        setOnClickListener { cur = o; paint(); optionChanged(key) }
                     }
                     pills += t; row.addView(t)
                 }
@@ -614,6 +627,11 @@ class MacrosPage(private val a: MainActivity) {
                 setPadding(dp(12), dp(10), dp(12), dp(10))
             }
             paramFields[key] = { field.text.toString() }
+            field.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(t: CharSequence?, st: Int, c: Int, after: Int) {}
+                override fun onTextChanged(t: CharSequence?, st: Int, before: Int, c: Int) {}
+                override fun afterTextChanged(e: android.text.Editable?) { optionChanged(key) }
+            })
             val side = besides[key]
             if (side == null) {
                 box.addView(field, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
@@ -630,7 +648,7 @@ class MacrosPage(private val a: MainActivity) {
                 gravity = Gravity.CENTER_VERTICAL
                 addView(field, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(Ui.text(a, Ui.title(sideKey), 14f).apply { setPadding(dp(14), 0, dp(6), 0) })
-                addView(switch(on) { v -> on = v; grey(); optionChanged() })
+                addView(switch(on) { v -> on = v; grey(); optionChanged(sideKey) })
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
         }
     }
@@ -657,7 +675,7 @@ class MacrosPage(private val a: MainActivity) {
             addView(LinearLayout(a).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(Ui.text(a, "${Ui.title(inner)} options", 15f, Ui.ACCENT, bold = true))
-                addView(Ui.text(a, "This macro runs $inner and keeps its own settings for it: they start as $inner's own, and are saved with this macro.", 12.5f, Ui.MUTED))
+                addView(Ui.text(a, "This macro runs $inner and keeps its own settings for it: until you change one here, it follows $inner's own.", 12.5f, Ui.MUTED))
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(Ui.text(a, "Open", 13f, Ui.ACCENT).apply {
                 setPadding(dp(10), dp(6), dp(4), dp(6))

@@ -49,6 +49,12 @@ data class GameProfile(
     val claude: Claude,
     /** How run reports are shown (the outcome card, Statistics). */
     val reports: Reports = Reports("", emptyList()),
+    /**
+     * The global parameters (System → Settings → Global parameters): options many macros share,
+     * set once for all of them (e.g. a party, a skill per slot). A macro option follows one with
+     * `global: <key>` while it is set to "global" ([Globals]). In game.yaml order.
+     */
+    val globals: Map<String, Param> = emptyMap(),
 ) {
     /** The run reports macros write: [title] of the Statistics section, [fields] in line order. */
     data class Reports(val title: String, val fields: List<ReportField>)
@@ -123,6 +129,12 @@ data class GameProfile(
                     Reports(str(r["title"]), (r["fields"] as? List<*>).orEmpty().map { f -> map(f).let {
                         ReportField(str(it["key"]), str(it["show"]), str(it["total"]), str(it["of"]), str(it["card"]), it["duration"] == true)
                     } })
+                },
+                globals = map(y["globals"]).entries.associate { (k, v) ->
+                    val m = map(v)
+                    val default = m["default"] ?: v.takeIf { it !is Map<*, *> }
+                    val type = str(m["type"]).ifEmpty { if (default is Boolean) "bool" else "text" }
+                    str(k) to Param(Expr.str(default), str(m["help"]), (m["choices"] as? List<*>).orEmpty().map { Expr.str(it) }, type)
                 },
             )
         }

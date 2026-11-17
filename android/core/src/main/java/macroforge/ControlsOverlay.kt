@@ -221,7 +221,8 @@ class ControlsOverlay(private val service: InputService) {
             MacroLog.i("open the app once and run a macro; the buttons then repeat it")
             return
         }
-        service.startService(LastRun.intent(service, last.first, last.second))
+        // the macro's options as they are now (they save as soon as they change on the Macros page)
+        service.startService(LastRun.intent(service, last.first, MacroParams.load(service, last.first)))
     }
 
     /** Bring the app's own screen to the front (the macro, if any, keeps running). */
