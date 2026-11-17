@@ -30,6 +30,8 @@ safety:
   purchase_words: [purchase, insufficient, not enough, "buy "]
   # anywhere on screen: premium currency; taps there need the user's OK
   premium_words: [gem, gems]
+  # anywhere on screen: the premium currency is a reward being received, so taps don't ask
+  reward_words: [reward for watching]
   # the purchase guard: while this template shows (the shop), macros may only tap shop_safe ones
   shop_screen: shop_title
   shop_close: shop_close_button

@@ -54,8 +54,9 @@ user's relay, a small Cloudflare Worker on their own account ([relay/README.md](
   just the prompt): taps only while the game is in front; every tap goes through
   `Context.tap`'s purchase guard; screens offering a purchase are refused (a second attempt
   turns the connector off); taps on sell/discard/release/exchange/... or on screens naming the
-  premium currency (game.yaml `safety`) ask the user on the phone (`AskOverlay.kt`, denied after
-  2 minutes because connector tool calls time out at 240 s). Macros run in the background
+  premium currency (game.yaml `safety`, except while a `reward_words` phrase shows it is a reward
+  being received) ask the user on the phone (`AskOverlay.kt`; after 45 s without an answer,
+  because connector tool calls time out at 60 s, the question moves to a notification). Macros run in the background
   (`start_macro` / `macro_status`) for the same reason; library macro names can't be replaced.
 - `McpServer.kt`: the MCP JSON-RPC (initialize, ping, tools/list, tools/call), unit tested.
 - `ClaudePrompt.kt`: what Claude is told about the game (game.yaml `claude`).

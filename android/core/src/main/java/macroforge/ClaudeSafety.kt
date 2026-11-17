@@ -33,6 +33,9 @@ object ClaudeSafety {
     /** Anywhere on screen: premium currency. Taps there need the user's OK (game.yaml). */
     private val PREMIUM_ANYWHERE get() = GameProfile.current.premiumWords
 
+    /** Anywhere on screen: the premium currency is a reward being received, so it doesn't ask (game.yaml). */
+    private val REWARD_ANYWHERE get() = GameProfile.current.rewardWords
+
     fun gameInFront(ctx: Context): Boolean {
         var fg = ctx.foreground
         // a missed window event can leave another app (often the launcher) as "in front": look again
@@ -66,6 +69,7 @@ object ClaudeSafety {
             val n = " " + Ocr.norm(l.text) + " "
             RISKY_NEAR.firstOrNull { " $it " in n || n.contains(" $it") }?.let { return Verdict.Confirm(l.text.trim()) }
         }
+        if (REWARD_ANYWHERE.any { Ocr.norm(it).let { w -> w.isNotEmpty() && w in all } }) return Verdict.Ok
         PREMIUM_ANYWHERE.firstOrNull { it in all }?.let { return Verdict.Confirm("a screen that mentions $it") }
         return Verdict.Ok
     }

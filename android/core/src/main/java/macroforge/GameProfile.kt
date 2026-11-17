@@ -31,6 +31,12 @@ data class GameProfile(
     val purchaseWords: List<String>,
     /** Words that mean premium currency: taps there need the user's OK (lowercase). */
     val premiumWords: List<String>,
+    /**
+     * Words that show the premium currency on screen is a reward being received (a commercial's
+     * reward, a login bonus), not spent: with one of them on screen, [premiumWords] don't ask (lowercase).
+     * [purchaseWords] and irreversible buttons still count.
+     */
+    val rewardWords: List<String> = emptyList(),
     /** The template that shows the game's shop is open (purchase guard), or "" for none. */
     val shopScreen: String,
     /** The template of the shop's close button, or "". */
@@ -101,6 +107,7 @@ data class GameProfile(
                 relayGuide = str(y["relay_guide"]),
                 purchaseWords = list(safety["purchase_words"]).map { it.lowercase() },
                 premiumWords = list(safety["premium_words"]).map { it.lowercase() },
+                rewardWords = list(safety["reward_words"]).map { it.lowercase() },
                 shopScreen = str(safety["shop_screen"]),
                 shopClose = str(safety["shop_close"]),
                 shopSafe = list(safety["shop_safe"]).toSet(),
