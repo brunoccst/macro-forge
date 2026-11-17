@@ -19,6 +19,9 @@ macro-forge is the generic part. A game app uses it and adds what is its own:
   capture, OCR, the phone connector, the UI, the updater, the macro runner) and the generic macro
   steps (`macroforge.logic`), which also ship on their own as a downloadable logic pack.
 
+- `relay`: a Cloudflare Worker that gives the phone connector a public HTTPS address, so Claude
+  can reach the phone as a custom connector (`relay/README.md`).
+- `docs`: the game profile (`docs/game-profile.md`) and the logic pack (`docs/logic-pack.md`).
 - `starter/game.yaml` and `android/starter`: a made-up game ("Pocket Quest") and its app, with a
   one-step game plugin (`starter.logic.StarterPlugin`). Copy them to start an app for your game.
 
