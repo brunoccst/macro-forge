@@ -44,6 +44,10 @@ class SystemPage(private val a: MainActivity) {
     private val connectorListener: () -> Unit = { a.runOnUiThread { refreshConnector() } }
     val view: View
     private val tabsRow = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL; setPadding(dp(16), dp(12), dp(16), dp(4)) }
+    // the Global parameters card on the Settings tab (drawGlobals)
+    private val globalsSection = Ui.section(a, "Global parameters")
+    private val globalsCard = Ui.card(a)
+
     /** Each tab's content, by tab id. */
     private val tabs = LinkedHashMap<String, LinearLayout>()
     private val tabTitles = mapOf("setup" to "Setup", "claude" to "Claude", "settings" to "Settings", "updates" to "Updates", "log" to "Log")
@@ -242,9 +246,6 @@ class SystemPage(private val a: MainActivity) {
         }
         view = scroll
     }
-
-    private val globalsSection = Ui.section(a, "Global parameters")
-    private val globalsCard = Ui.card(a)
 
     /**
      * Global parameters ([Globals]): one row per global the game declares, saved as soon as it
