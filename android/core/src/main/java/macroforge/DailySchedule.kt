@@ -8,7 +8,7 @@ import android.content.Intent
 
 /**
  * A daily run with nobody watching: one macro (by default the daily routine) starts every day a
- * few minutes after the game's daily reset, while screen capture is on. Android's alarm wakes
+ * few minutes after the game's daily reset (game.yaml `daily_reset:`, or the user's own time), while screen capture is on. Android's alarm wakes
  * the app; the run then goes like one started with ▶, with the macro's own saved options, and
  * ends with the usual outcome message and notification.
  *
@@ -17,8 +17,6 @@ import android.content.Intent
  */
 object DailySchedule {
     private const val PREFS = "schedule"
-    /** The game's daily reset, in UTC. */
-    const val RESET_HOUR_UTC = 15
     const val DEFAULT_MACRO = "daily-routine"
     const val DEFAULT_DELAY_MIN = 10
     const val RETRY_MS = 15 * 60_000L
@@ -30,15 +28,23 @@ object DailySchedule {
     fun enabled(c: Context) = prefs(c).getBoolean("on", false)
     fun macro(c: Context) = prefs(c).getString("macro", null)?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_MACRO
     fun delayMin(c: Context) = prefs(c).getInt("delay_min", DEFAULT_DELAY_MIN)
+    /** The game's daily reset in minutes after midnight UTC: the user's own time, else game.yaml's, else midnight. */
+    fun resetMin(c: Context) = prefs(c).getInt("reset_min", -1).takeIf { it in 0 until 24 * 60 } ?: gameResetMin()
+    /** The reset game.yaml gives (midnight UTC without one). */
+    fun gameResetMin() = GameProfile.current.dailyResetUtcMin ?: 0
+    /** Whether the user set their own reset time (else game.yaml's counts). */
+    fun resetIsCustom(c: Context) = prefs(c).getInt("reset_min", -1) in 0 until 24 * 60
 
     fun setEnabled(c: Context, on: Boolean) { prefs(c).edit().putBoolean("on", on).apply(); arm(c) }
     fun setMacro(c: Context, name: String) { prefs(c).edit().putString("macro", name.trim()).apply() }
+    /** The user's own reset time (minutes after midnight UTC), or null to follow game.yaml again. */
+    fun setResetMin(c: Context, min: Int?) { prefs(c).edit().putInt("reset_min", min ?: -1).apply(); arm(c) }
     fun setDelayMin(c: Context, min: Int) { prefs(c).edit().putInt("delay_min", min.coerceIn(0, 23 * 60)).apply(); arm(c) }
 
-    /** The next run after [now]: today's (or tomorrow's) reset plus [delayMin] minutes. */
-    fun nextAt(now: Long, delayMin: Int, resetHourUtc: Int = RESET_HOUR_UTC): Long {
+    /** The next run after [now]: today's (or tomorrow's) reset ([resetUtcMin] after midnight UTC) plus [delayMin] minutes. */
+    fun nextAt(now: Long, delayMin: Int, resetUtcMin: Int): Long {
         val day = 24 * 3_600_000L
-        val offset = resetHourUtc * 3_600_000L + delayMin * 60_000L
+        val offset = resetUtcMin * 60_000L + delayMin * 60_000L
         var at = Math.floorDiv(now, day) * day + offset
         while (at <= now) at += day
         while (at - day > now) at -= day
@@ -47,7 +53,7 @@ object DailySchedule {
 
     /** When the next run is, in the phone's time ("16:10"), for the settings page. */
     fun describeNext(c: Context): String {
-        val at = nextAt(System.currentTimeMillis(), delayMin(c))
+        val at = nextAt(System.currentTimeMillis(), delayMin(c), resetMin(c))
         return java.text.SimpleDateFormat("EEE HH:mm", java.util.Locale.getDefault()).format(java.util.Date(at))
     }
 
@@ -62,7 +68,7 @@ object DailySchedule {
         am.cancel(pi)
         if (!enabled(c)) return
         // inexact on purpose: no special permission, and a few minutes late doesn't matter here
-        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextAt(System.currentTimeMillis(), delayMin(c)), pi)
+        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextAt(System.currentTimeMillis(), delayMin(c), resetMin(c)), pi)
     }
 
     private fun retry(c: Context, attempt: Int) {
