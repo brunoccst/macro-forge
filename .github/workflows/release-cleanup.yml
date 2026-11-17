@@ -1,0 +1,106 @@
+name: release-cleanup
+# Reusable: removes branch pre-releases ("dev-<branch>", "macros-<branch>") and their tags once
+# nobody needs them, so the releases page holds the official release, main's builds and the
+# builds of open pull requests only.
+#
+# - On a pull request that closes (merged or not): deletes that branch's pre-releases, unless the
+#   branch is main or another open pull request still uses it. A later push recreates them.
+# - Run by hand (or on a schedule): a sweep. Deletes every branch pre-release whose branch is not
+#   main and has no open pull request. With old_releases, it also deletes the official releases
+#   older than the latest one (their version tags stay, so a release can be made again).
+# - dry_run lists what would go and deletes nothing.
+#
+#   on:
+#     pull_request: {types: [closed]}
+#     workflow_dispatch:
+#       inputs:
+#         dry_run: {type: boolean, default: true}
+#         old_releases: {type: boolean, default: false}
+#   jobs:
+#     cleanup:
+#       uses: <owner>/macro-forge/.github/workflows/release-cleanup.yml@main
+#       permissions: {contents: write, pull-requests: read}
+#       with:
+#         dry_run: ${{ inputs.dry_run || false }}
+#         old_releases: ${{ inputs.old_releases || false }}
+on:
+  workflow_call:
+    inputs:
+      prefixes:
+        description: "Tag prefixes of branch pre-releases, space separated"
+        type: string
+        default: "dev- macros-"
+      keep_branches:
+        description: "Branches whose pre-releases always stay, space separated"
+        type: string
+        default: "main"
+      dry_run:
+        description: "Only list what would be deleted"
+        type: boolean
+        default: false
+      old_releases:
+        description: "Sweep only: also delete official releases older than the latest (tags kept)"
+        type: boolean
+        default: false
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    # a fork's pull request has no write token, and its branch has no pre-releases here anyway
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Delete stale pre-releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          CLOSED_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PREFIXES: ${{ inputs.prefixes }}
+          KEEP: ${{ inputs.keep_branches }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          OLD_RELEASES: ${{ inputs.old_releases }}
+        run: |
+          set -euo pipefail
+          # the same name the build workflows give a branch's tag
+          tagname() { echo "$1" | sed 's/[^A-Za-z0-9._-]/-/g'; }
+          drop() {  # tag, --cleanup-tag or nothing
+            if [ "$DRY_RUN" = "true" ]; then echo "would delete: $1"; return; fi
+            echo "deleting: $1"
+            gh release delete "$1" -y $2 || echo "::warning::could not delete $1"
+          }
+
+          # branches still in use: the kept ones and every open pull request's head (this repo)
+          keep=""
+          for b in $KEEP; do keep="$keep $(tagname "$b")"; done
+          for b in $(gh pr list --state open --limit 1000 --json headRefName,isCrossRepository \
+                       --jq '.[] | select(.isCrossRepository | not) | .headRefName'); do
+            keep="$keep $(tagname "$b")"
+          done
+          in_use() { case " $keep " in *" $1 "*) return 0;; esac; return 1; }
+
+          releases=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+
+          if [ "$EVENT" = "pull_request" ]; then
+            name=$(tagname "$CLOSED_BRANCH")
+            if in_use "$name"; then echo "$CLOSED_BRANCH is still in use: nothing to delete"; exit 0; fi
+            for p in $PREFIXES; do
+              if echo "$releases" | grep -qxF "$p$name"; then drop "$p$name" --cleanup-tag; fi
+            done
+            exit 0
+          fi
+
+          # sweep
+          for tag in $releases; do
+            for p in $PREFIXES; do
+              case "$tag" in "$p"*)
+                in_use "${tag#"$p"}" || drop "$tag" --cleanup-tag
+                break;;
+              esac
+            done
+          done
+          if [ "$OLD_RELEASES" = "true" ]; then
+            latest=$(gh release view --json tagName --jq .tagName)
+            for tag in $(gh release list --limit 1000 --exclude-pre-releases --exclude-drafts \
+                           --json tagName --jq '.[].tagName'); do
+              [ "$tag" = "$latest" ] || drop "$tag" ""
+            done
+          fi
