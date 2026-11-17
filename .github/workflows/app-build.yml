@@ -1,0 +1,101 @@
+name: app-build
+# Reusable: a game app's dev build. Unit tests, the debug APK and the logic pack (docs/logic-pack.md);
+# on a push (not a pull request) with a signing key, both are published as the pre-release
+# "dev-<branch>", replaced on every push, which the app's updater and build picker install.
+#
+#   jobs:
+#     apk:
+#       uses: <owner>/macro-forge/.github/workflows/app-build.yml@main
+#       permissions: {contents: write}
+#       secrets: inherit          # ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD
+#       with: {apk_name: my-app.apk, app_dir: android/app}
+on:
+  workflow_call:
+    inputs:
+      apk_name:
+        description: "The APK's file name in the dev build (e.g. my-app.apk)"
+        type: string
+        required: true
+      artifact:
+        description: "Name of the APK's Actions artifact"
+        type: string
+        default: app-apk
+      android_dir:
+        description: "The Gradle root project of the app"
+        type: string
+        default: android
+      app_dir:
+        description: "The app module (its build/outputs/apk/debug holds the APK)"
+        type: string
+        default: android/app
+    secrets:
+      ANDROID_KEYSTORE_B64:
+        required: false
+      ANDROID_KEYSTORE_PASSWORD:
+        required: false
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            echo "ANDROID_KEYSTORE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_B64 secret not set: APK is signed with a throwaway debug key and cannot update an installed copy"
+          fi
+      - name: Unit tests (no device)
+        run: gradle -p "${{ inputs.android_dir }}" testDebugUnitTest --stacktrace
+      - name: Build debug APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          VERSION_NAME: 0.0.${{ github.run_number }}-dev
+          # the branch a dev build follows for its own updates (none for PR builds)
+          BUILD_BRANCH: ${{ github.event_name != 'pull_request' && github.ref_name || '' }}
+        run: |
+          # minutes since 2025-01-01: every build is an upgrade of the one before (self-update)
+          export VERSION_CODE=$(( ($(date +%s) - 1735689600) / 60 ))
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          # the logic pack (Logic.kt) comes from the same compile as the APK
+          gradle -p "${{ inputs.android_dir }}" assembleDebug logicPack --stacktrace
+          echo "SHELL_ID=$(unzip -p "${{ inputs.android_dir }}/build/outputs/logic/logic.zip" logic.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["shell"])')" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ inputs.app_dir }}/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: logic-pack
+          path: ${{ inputs.android_dir }}/build/outputs/logic/logic.zip
+      # One pre-release per branch, "dev-<branch>". Only signed builds (a throwaway key can't
+      # update). logic.zip rides along: a phone whose app has the same shell loads it instead.
+      - name: Publish the dev build
+        if: github.event_name != 'pull_request' && env.ANDROID_KEYSTORE != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          APK: ${{ inputs.apk_name }}
+        run: |
+          TAG="dev-$(echo "$BRANCH" | sed 's/[^A-Za-z0-9._-]/-/g')"
+          cp ${{ inputs.app_dir }}/build/outputs/apk/debug/*.apk "$APK"
+          NOTES="Dev build of \`$BRANCH\` at ${GITHUB_SHA::7} (not a release).
+          versionName: 0.0.${{ github.run_number }}-dev
+          versionCode: $VERSION_CODE
+          shell: $SHELL_ID
+          commit: $GITHUB_SHA"
+          gh release delete "$TAG" --cleanup-tag -y 2>/dev/null || true
+          gh release create "$TAG" "$APK" "${{ inputs.android_dir }}/build/outputs/logic/logic.zip" --prerelease --target "$GITHUB_SHA" \
+            --title "Dev build: $BRANCH" --notes "$NOTES"

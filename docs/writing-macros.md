@@ -8,8 +8,8 @@ macros, their groups and its game notes in its own repository.
 
 - **Library macros** are `macros/<group>/<name>.yaml` in the game app's repository (`group:`
   must match the folder, and be one of game.yaml's `groups:`). The app's CI packs them with their
-  templates and data into a `macros-<branch>` pre-release, and phones pick up the pack by
-  themselves.
+  templates and data into a `macros-<branch>` pre-release (`tools/macroforge_pack.py --root
+  <game repo>`, which first checks every macro), and phones pick up the pack by themselves.
 - **Custom macros** are drafts that Claude saves on the phone through the connector
   (`save_macro`). Once one works and fits a group, it moves into `macros/<group>/` with a pull
   request and the phone copy is deleted (`delete_macro`).

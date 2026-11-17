@@ -14,6 +14,8 @@ the profile instead of naming a game, so the same code serves any game with its 
 | `safety.purchase_words` | Words that mean an offer to pay: never tapped |
 | `safety.premium_words` | Words that mean premium currency: taps there need the user's OK |
 | `groups` | The macro groups in tab order: `id` (a macro's `group:` and its folder in `macros/`), `title`, `icon` (`res/drawable/ic_<icon>.xml`) |
+| `plugin_steps` | The plugin's steps that describe themselves in the app's "How it works": a macro using one needs no `how:` list (checked by `tools/macroforge_pack.py`) |
+| `pack.common`, `pack.folders` | Where the macro pack takes its templates from: the shared folder (default `templates/common`) and the folder of template folders (default `folders`, each `<name>/templates/` plus its `.yaml` data) |
 
 ## How it reaches the phone
 
