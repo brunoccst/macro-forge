@@ -55,6 +55,8 @@ data class GameProfile(
      * `global: <key>` while it is set to "global" ([Globals]). In game.yaml order.
      */
     val globals: Map<String, Param> = emptyMap(),
+    /** The game's daily reset, in minutes after midnight UTC (`daily_reset: "15:00"`), or null if game.yaml has none. */
+    val dailyResetUtcMin: Int? = null,
 ) {
     /** The run reports macros write: [title] of the Statistics section, [fields] in line order. */
     data class Reports(val title: String, val fields: List<ReportField>)
@@ -136,7 +138,19 @@ data class GameProfile(
                     val type = str(m["type"]).ifEmpty { if (default is Boolean) "bool" else "text" }
                     str(k) to Param(Expr.str(default), str(m["help"]), (m["choices"] as? List<*>).orEmpty().map { Expr.str(it) }, type)
                 },
+                dailyResetUtcMin = parseClock(str(y["daily_reset"])),
             )
         }
+
+        /** "HH:MM" (or "H") as minutes after midnight, or null if it isn't a time of day. */
+        fun parseClock(s: String): Int? {
+            val m = Regex("""^(\d{1,2})(?::(\d{2}))?$""").matchEntire(s.trim()) ?: return null
+            val h = m.groupValues[1].toInt()
+            val min = m.groupValues[2].ifEmpty { "0" }.toInt()
+            return if (h in 0..23 && min in 0..59) h * 60 + min else null
+        }
+
+        /** Minutes after midnight as "HH:MM". */
+        fun clock(min: Int) = "%02d:%02d".format(min / 60, min % 60)
     }
 }

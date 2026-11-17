@@ -57,13 +57,25 @@ class AlwaysOnTest {
         val day = 24 * h
         val d0 = 20 * day // midnight UTC
         // before today's reset: today, 15:10 UTC
-        assertEquals(d0 + 15 * h + 10 * m, DailySchedule.nextAt(d0 + 9 * h, 10))
+        assertEquals(d0 + 15 * h + 10 * m, DailySchedule.nextAt(d0 + 9 * h, 10, 15 * 60))
         // just after it: tomorrow
-        assertEquals(d0 + day + 15 * h + 10 * m, DailySchedule.nextAt(d0 + 15 * h + 10 * m, 10))
-        assertEquals(d0 + day + 15 * h, DailySchedule.nextAt(d0 + 23 * h, 0))
+        assertEquals(d0 + day + 15 * h + 10 * m, DailySchedule.nextAt(d0 + 15 * h + 10 * m, 10, 15 * 60))
+        assertEquals(d0 + day + 15 * h, DailySchedule.nextAt(d0 + 23 * h, 0, 15 * 60))
         // a delay past midnight UTC
-        assertEquals(d0 + day + 1 * h, DailySchedule.nextAt(d0 + 12 * h, 10 * 60))
-        assertEquals(d0 + 1 * h, DailySchedule.nextAt(d0 + 30 * m, 10 * 60))
+        assertEquals(d0 + day + 1 * h, DailySchedule.nextAt(d0 + 12 * h, 10 * 60, 15 * 60))
+        assertEquals(d0 + 1 * h, DailySchedule.nextAt(d0 + 30 * m, 10 * 60, 15 * 60))
+        // another game's reset (04:30 UTC)
+        assertEquals(d0 + day + 4 * h + 40 * m, DailySchedule.nextAt(d0 + 5 * h, 10, 4 * 60 + 30))
+    }
+
+    @Test fun resetTimeParses() {
+        assertEquals(15 * 60, GameProfile.parseClock("15:00"))
+        assertEquals(4 * 60 + 30, GameProfile.parseClock(" 4:30 "))
+        assertEquals(9 * 60, GameProfile.parseClock("9"))
+        assertEquals(null, GameProfile.parseClock("24:00"))
+        assertEquals(null, GameProfile.parseClock(""))
+        assertEquals("04:30", GameProfile.clock(4 * 60 + 30))
+        assertEquals(15 * 60, GameProfile.parse("name: X\ndaily_reset: \"15:00\"").dailyResetUtcMin)
     }
 
     @Test fun deferredAnswerCountsOnceForTheSameTarget() {

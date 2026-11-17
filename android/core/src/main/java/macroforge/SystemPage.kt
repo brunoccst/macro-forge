@@ -144,7 +144,7 @@ class SystemPage(private val a: MainActivity) {
                 nextRun.text = if (DailySchedule.enabled(a)) "Next run: ${DailySchedule.describeNext(a)} (your time)." else "Off."
             }
             addView(switchRow("Daily schedule",
-                "Runs a macro every day a few minutes after the game's daily reset (${DailySchedule.RESET_HOUR_UTC}:00 UTC), with its own saved options. Screen capture must be on; if it's off, a notification says the run was skipped.",
+                "Runs a macro every day a few minutes after the game's daily reset, with its own saved options. Screen capture must be on; if it's off, a notification says the run was skipped.",
                 DailySchedule.enabled(a)) { on -> DailySchedule.setEnabled(a, on); showNext() })
             addView(Ui.text(a, "Macro to run", 13.5f, bold = true).apply { setPadding(0, dp(8), 0, 0) })
             scheduleMacro = android.widget.Spinner(a, android.widget.Spinner.MODE_DROPDOWN).apply {
@@ -155,6 +155,16 @@ class SystemPage(private val a: MainActivity) {
             }
             addView(scheduleMacro)
             drawScheduleChoices()
+            addView(Ui.text(a, "Daily reset (UTC)", 13.5f, bold = true).apply { setPadding(0, dp(8), 0, 0) })
+            val gameReset = GameProfile.clock(DailySchedule.gameResetMin())
+            addView(Ui.text(a, "When the game's day starts, as HH:MM in UTC. Leave it empty for the game's own time ($gameReset).", 12.5f, Ui.MUTED))
+            addView(field(gameReset).apply {
+                if (DailySchedule.resetIsCustom(a)) setText(GameProfile.clock(DailySchedule.resetMin(a)))
+                onChange { v ->
+                    if (v.isBlank()) { DailySchedule.setResetMin(a, null); showNext() }
+                    else GameProfile.parseClock(v)?.let { DailySchedule.setResetMin(a, it); showNext() }
+                }
+            })
             addView(Ui.text(a, "Minutes after the reset", 13.5f, bold = true).apply { setPadding(0, dp(8), 0, 0) })
             addView(field(DailySchedule.DEFAULT_DELAY_MIN.toString()).apply {
                 inputType = InputType.TYPE_CLASS_NUMBER

@@ -12,6 +12,8 @@ about: >-
 # same package is a commercial)
 package: com.example.pocketquest
 activity: com.example.pocketquest.MainActivity
+# when the game's day starts, in UTC: the Daily schedule runs a few minutes after it
+daily_reset: "00:00"
 # the GitHub repo (owner/name) that hosts this app's builds and macro packs
 repo: your-name/your-macro-app
 # the Android app's id (its package on the phone)

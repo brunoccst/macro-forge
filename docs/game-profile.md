@@ -35,6 +35,7 @@ next macro pack. Without a pack copy the logic uses the app's own.
 |---|---|
 | `app_name`, `tagline`, `about` | The app's name, the line under it and the Home page's text |
 | `safety.shop_screen`, `shop_close`, `shop_safe` | The purchase guard: while the shop template shows, macros may only tap `shop_safe` templates |
+| `daily_reset` | When the game's day starts, `"HH:MM"` in UTC (e.g. `"15:00"`): the Daily schedule runs its macro a few minutes after it. The user can set another time on System → Settings. Without it: midnight UTC |
 | `relay_guide` | The web address of the relay setup guide the app links to (default: the repo's `relay/README.md`) |
 | `claude` | What Claude is told about the game: extra how-to lines, premium-currency examples, the example macro, a reward text example, extra macro-format lines |
 
