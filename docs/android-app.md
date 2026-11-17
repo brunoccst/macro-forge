@@ -75,8 +75,20 @@ user's relay, a small Cloudflare Worker on their own account ([relay/README.md](
   connector is on and idle, on `update_app`, and on *Install the newest build*. When only the
   logic changed it loads the logic pack with no install ([logic-pack.md](logic-pack.md));
   otherwise it installs the APK. If Play Protect blocks an unattended install, the app taps
-  *Got it* (never *Install anyway*) and doesn't retry that version. After any install, screen
-  capture and the connector stay off until the user turns them on.
+  *Got it* (never *Install anyway*) and doesn't retry that version.
+- **Back on after a dev self-update:** Android ends screen capture when an app is replaced, and
+  every new capture needs a yes in Android's own question; no app can skip it by itself. After an
+  *unattended* install (the 3-minute check or `update_app`, never one the user started), within 10
+  minutes of the install, a dev build brings itself back: the accessibility service reopens the
+  app, the app turns the screen on and keeps it on (Android closes the question when the screen
+  goes off), asks for capture of the whole screen (Android 14+: no "single app" choice), and the
+  accessibility service presses the question's own *Start now* / *Start* / *Share screen*. It
+  asks up to 3 times; then the connector (if it was on) and the game come back. If taps are off
+  or all tries fail, a notification stays: one tap asks again and brings the connector back with
+  it. Release builds never do any of this. To never see the question at all, grant the app
+  `PROJECT_MEDIA` once from a computer (`adb shell appops set <package> PROJECT_MEDIA allow`):
+  Android then answers yes by itself, for every build, until the app is uninstalled. A manual
+  install the user starts leaves capture and the connector off until the user turns them on.
 - **Releases** (`vX.Y.Z`): a GitHub Release with the signed APK. Release builds check for a newer
   release when they open (at most every 6 hours). They don't load logic packs, so stay on dev
   builds to follow `main`. versionCode is derived from the version (1.2.3 → 10203).

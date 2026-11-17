@@ -46,6 +46,14 @@
         <receiver
             android:name=".Updater$InstallResult"
             android:exported="false" />
+        <!-- after an unattended dev update: a fallback notification to turn screen capture back on -->
+        <receiver
+            android:name=".Updater$Replaced"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- the daily schedule's alarm (DailySchedule) and the Allow/Deny buttons of Claude's questions (Alerts) -->
         <receiver

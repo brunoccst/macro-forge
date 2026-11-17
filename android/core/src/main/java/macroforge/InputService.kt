@@ -51,7 +51,7 @@ class InputService : AccessibilityService() {
         if (System.currentTimeMillis() > Updater.autoConfirmUntil(this)) return
         val words = when {
             "packageinstaller" in pkg -> listOf("update", "install")
-            pkg == "com.android.systemui" -> listOf("start now", "start")
+            pkg == "com.android.systemui" -> CAPTURE_WORDS
             // Play Protect blocking the update: only dismiss it ("Got it" keeps the block; never
             // "Install anyway", that is the user's call), so the game is usable again; the next
             // automatic check tries the install again
@@ -67,6 +67,20 @@ class InputService : AccessibilityService() {
             if (left > 0) main.postDelayed({ attempt(left - 1) }, 700)
         }
         main.postDelayed({ attempt(5) }, 500)
+    }
+
+    /**
+     * The app just asked for screen capture after a self-update: look for the question's start button
+     * for a while even if no window event comes (Samsung's dialog sometimes sends none), only inside the
+     * self-update window and only in System UI's own windows.
+     */
+    fun confirmCaptureSoon() {
+        fun attempt(left: Int) {
+            if (MacroService.capture != null || System.currentTimeMillis() > Updater.autoConfirmUntil(this)) return
+            if (clickButton("com.android.systemui", CAPTURE_WORDS)) return
+            if (left > 0) main.postDelayed({ attempt(left - 1) }, 700)
+        }
+        main.postDelayed({ attempt(20) }, 800)
     }
 
     /**
@@ -130,6 +144,9 @@ class InputService : AccessibilityService() {
             }
         }
     }
+
+    /** The screen-capture question's start button: "Start now" (Android 13 and Samsung), "Start", "Share screen" (Android 14+). */
+    private val CAPTURE_WORDS = listOf("start now", "start", "share screen", "start recording")
 
     private val OVERLAYS = setOf(
         "com.android.vending", "com.google.android.gms", "com.samsung.android.app.cocktailbarservice", "com.android.systemui",

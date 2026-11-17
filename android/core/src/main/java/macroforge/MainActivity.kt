@@ -266,8 +266,36 @@ class MainActivity : Activity() {
 
     internal fun requestCapture() {
         val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        // Android 14+: the whole screen only (macros read the whole screen), so the question has no
+        // "a single app" choice and its one button starts the capture
+        val ask = if (Build.VERSION.SDK_INT >= 34) mpm.createScreenCaptureIntent(android.media.projection.MediaProjectionConfig.createConfigForDefaultDisplay())
+            else mpm.createScreenCaptureIntent()
         @Suppress("DEPRECATION")
-        startActivityForResult(mpm.createScreenCaptureIntent(), REQUEST_CAPTURE)
+        startActivityForResult(ask, REQUEST_CAPTURE)
+    }
+
+    /**
+     * After an unattended dev update: turn the screen on (Android closes the capture question when
+     * the screen goes off, which is what left capture off overnight) and keep it on, then ask for
+     * screen capture; the accessibility service presses the question's start button
+     * ([InputService.confirmCaptureSoon]).
+     */
+    private fun resumeCapture() {
+        if (!Updater.resumePending(this) || !Updater.nextCaptureTry(this)) {
+            if (Updater.resumePending(this)) Updater.askUserToRestore(this)
+            return
+        }
+        MacroLog.i("updated to ${BuildConfig.VERSION_NAME}: turning screen capture back on")
+        Thread {
+            ScreenWake.init(this)
+            ScreenWake.hold("resume", 3 * 60_000L)
+            ScreenWake.wakeNow()
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                requestCapture()
+                InputService.instance?.confirmCaptureSoon()
+            }
+        }.start()
     }
 
     @Deprecated("startActivityForResult is enough here")
@@ -277,6 +305,8 @@ class MainActivity : Activity() {
         if (requestCode != REQUEST_CAPTURE) return
         if (resultCode != RESULT_OK || data == null) {
             MacroLog.i("screen capture was not allowed")
+            // after an unattended update: ask again (a few times), then leave it to the user
+            if (Updater.resumePending(this)) pageTitle.postDelayed({ resumeCapture() }, 3000)
             return
         }
         val svc = MacroService.intent(this, MacroService.ACTION_START_CAPTURE)
@@ -284,7 +314,7 @@ class MainActivity : Activity() {
             .putExtra(MacroService.EXTRA_RESULT_DATA, data)
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(svc) else startService(svc)
         pageTitle.postDelayed({ refreshStatus() }, 800)
-        if (Updater.resumePending(this)) pageTitle.postDelayed({ resumeAfterUpdate() }, 2000)
+        if (Updater.resumePending(this) || Updater.restoreAsked(this)) pageTitle.postDelayed({ resumeAfterUpdate() }, 2000)
     }
 
     /** After a self-update: the connector back on (if it was), the game in front. */
@@ -292,6 +322,7 @@ class MainActivity : Activity() {
         if (MacroService.capture == null) { pageTitle.postDelayed({ resumeAfterUpdate() }, 1000); return }
         val connector = Updater.resumeConnector(this)
         Updater.clearResume(this)
+        ScreenWake.release("resume")
         if (connector) PhoneConnector.start(applicationContext)
         MacroLog.i("update done (${BuildConfig.VERSION_NAME}): capture on${if (connector) ", connector on" else ""}")
         InputService.instance?.launchApp(ClaudeSafety.GAME)
@@ -319,8 +350,14 @@ class MainActivity : Activity() {
         if (intent?.getBooleanExtra(EXTRA_RESUME, false) == true) {
             intent.removeExtra(EXTRA_RESUME)
             if (!Updater.resumePending(this)) return
-            if (MacroService.capture == null) { MacroLog.i("updated to ${BuildConfig.VERSION_NAME}: turning screen capture back on"); requestCapture() }
-            else resumeAfterUpdate()
+            if (MacroService.capture == null) resumeCapture() else resumeAfterUpdate()
+            return
+        }
+        // the user tapped "Screen capture is off after the update": the question is theirs to answer
+        if (intent?.getBooleanExtra(EXTRA_RESTORE_CAPTURE, false) == true) {
+            intent.removeExtra(EXTRA_RESTORE_CAPTURE)
+            Updater.cancelRestoreNotice(this)
+            if (MacroService.capture == null) requestCapture() else if (Updater.restoreAsked(this)) resumeAfterUpdate()
             return
         }
         val name = intent?.getStringExtra("run") ?: return
@@ -335,6 +372,8 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_CAPTURE = 1
         const val EXTRA_RESUME = "resume_after_update"
+        /** From the notification left when capture didn't come back after an update: ask for it now. */
+        const val EXTRA_RESTORE_CAPTURE = "restore_capture"
         /** Open on this page: home, macros, stats or system. */
         const val EXTRA_PAGE = "page"
         /** With page stats: open this macro's statistics. */
