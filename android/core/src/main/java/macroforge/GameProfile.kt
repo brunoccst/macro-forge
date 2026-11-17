@@ -25,6 +25,8 @@ data class GameProfile(
     val repo: String,
     /** The game plugin: the Kotlin object (full name) with the game's own macro steps, or "" for none. */
     val plugin: String = "",
+    /** The relay setup guide's web address, or "" for the repo's relay/README.md. */
+    val relayGuide: String = "",
     /** Words that mean an offer to pay: never tapped (lowercase). */
     val purchaseWords: List<String>,
     /** Words that mean premium currency: taps there need the user's OK (lowercase). */
@@ -96,6 +98,7 @@ data class GameProfile(
                 activity = str(y["activity"]),
                 repo = str(y["repo"]),
                 plugin = str(y["plugin"]),
+                relayGuide = str(y["relay_guide"]),
                 purchaseWords = list(safety["purchase_words"]).map { it.lowercase() },
                 premiumWords = list(safety["premium_words"]).map { it.lowercase() },
                 shopScreen = str(safety["shop_screen"]),

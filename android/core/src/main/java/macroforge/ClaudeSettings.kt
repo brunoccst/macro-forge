@@ -18,7 +18,7 @@ import javax.crypto.spec.GCMParameterSpec
  * so they aren't copied to cloud backups either. They are never logged.
  */
 object ClaudeSettings {
-    val RELAY_GUIDE: String get() = "${GameProfile.current.repoUrl}/blob/main/relay/README.md"
+    val RELAY_GUIDE: String get() = GameProfile.current.relayGuide.ifEmpty { "${GameProfile.current.repoUrl}/blob/main/relay/README.md" }
     private const val PREFS = "claude"
     private const val KEY_ALIAS = "macroforge_claude_key"
 
