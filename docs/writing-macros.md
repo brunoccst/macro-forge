@@ -85,7 +85,20 @@ Actions (one key each):
 
 Expressions can use the params, variables and `found('t')`, `captured('t')`, `text_has('s')`,
 `screen_text(y0, y1)`, `game_in_front()`, `ad_in_front()`, `game_screen()` (the game's own
-activity in front: no commercial), `view_moved()`, `now()`, `pick(i, a, b, ...)`. The full,
+activity in front: no commercial), `view_moved()`, `now()`, `pick(i, a, b, ...)`, and three
+signs that a commercial has played to its end, so a macro can close it then instead of after a
+fixed time (logic/AdSigns.kt):
+
+- `ad_left()`: seconds until the commercial is over by its own signs, 0 = over, -1 = no sign. It
+  follows a thin progress bar along the top or bottom of the picture (two flat colours whose split
+  moves steadily; also in a portrait commercial, pillar-boxed in the middle) and countdown texts
+  ("Reward in 12 seconds", "5 seconds remaining"). Call it about once a pass: it learns the bar's
+  speed from the reads.
+- `screen_still()`: seconds the picture hasn't changed (the video over, a still end card up).
+- `ad_warning()`: a "Close video? You will lose your reward" box is up (closed too early).
+
+All text functions of one pass share one text read of the screen (read again after any step that
+may change it, such as `back`, `tap` or `wait`). The full,
 current list is the comment at the top of `android/core/src/main/java/macroforge/Flow.kt`.
 A new step written in Kotlin goes in `logic/FlowRun.kt` if any game could use it, else in the
 game's plugin (see [logic-pack.md](logic-pack.md)).
