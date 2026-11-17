@@ -18,7 +18,6 @@ macro-forge is the generic part. A game app uses it and adds what is its own:
 - `android/core`: the Android library. The shell (`macroforge`: permissions, taps, screen
   capture, OCR, the phone connector, the UI, the updater, the macro runner) and the generic macro
   steps (`macroforge.logic`), which also ship on their own as a downloadable logic pack.
-
 - `relay`: a Cloudflare Worker that gives the phone connector a public HTTPS address, so Claude
   can reach the phone as a custom connector (`relay/README.md`).
 - `docs`: the game profile (`docs/game-profile.md`) and the logic pack (`docs/logic-pack.md`).
