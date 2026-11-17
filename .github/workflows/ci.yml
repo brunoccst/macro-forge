@@ -20,3 +20,13 @@ jobs:
         run: gradle -p android testDebugUnitTest --stacktrace
       - name: Build the starter app and the logic pack
         run: gradle -p android assembleDebug logicPack --stacktrace
+  relay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Relay tests (no Cloudflare account needed)
+        working-directory: relay
+        run: npm test
