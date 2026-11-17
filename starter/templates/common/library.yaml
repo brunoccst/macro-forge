@@ -1,0 +1,4 @@
+# Templates every macro can use (the pack's "common" folder): name -> crop of the screen.
+# Capture them from the live screen with the phone connector's save_template.
+templates: {}
+screens: {}

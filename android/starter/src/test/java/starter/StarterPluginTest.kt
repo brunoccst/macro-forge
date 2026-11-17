@@ -16,7 +16,7 @@ class StarterPluginTest {
     @Test fun pluginStepsJoinTheGenericOnes() {
         val actions = Logic.current().entry.actions
         assertTrue("tap" in actions)
-        assertTrue("count" in actions)
-        assertEquals("add 1 to count", Logic.current().entry.label("count", true))
+        assertTrue("roll_die" in actions)
+        assertEquals("roll a die", Logic.current().entry.label("roll_die", true))
     }
 }

@@ -18,6 +18,12 @@ repo: your-name/your-macro-app
 application_id: starter.app
 # the game's own macro steps (logic pack): the Kotlin object implementing GamePlugin
 plugin: starter.logic.StarterPlugin
+# the plugin's steps: they describe themselves under "How it works" (tools/macroforge_pack.py)
+plugin_steps: [roll_die]
+# where the macro pack takes templates from (tools/macroforge_pack.py), relative to this file's folder
+pack:
+  common: templates/common
+  folders: folders
 
 safety:
   # anywhere on screen: an offer to pay; never tapped
@@ -43,10 +49,10 @@ claude:
   how_to_work:
     - "walk moves the hero on the map."
   premium_examples: gems
-  example_macro: count-taps
+  example_macro: roll-until-six
   reward_example: Gold Coin x5
   format:
-    - "  count: true          (a starter plugin step: adds 1 to the variable `count`)"
+    - "  roll_die: true       (a starter plugin step: sets `roll` to a number from 1 to 6)"
 
 # the run reports macros write (one per round): how the outcome card and Statistics show them
 # (RunStats.kt). A field is a switch (true/false), a number or a text, shown in this order.

@@ -1,0 +1,17 @@
+# Roll a die until it shows a six (an example of a game plugin step).
+name: roll-until-six
+description: Rolls the starter game's die until a six comes up.
+group: basic
+params:
+  max_rolls: {default: 20, help: "rolls at most"}
+screens: []
+unknown_timeout_s: 60
+setup:
+  - set: {rolls: 0}
+unknown:
+  - roll_die: true
+  - set: {rolls: "rolls + 1"}
+  - if: "roll == 6"
+    then: [{stop: "a six after {rolls} rolls"}]
+  - if: "rolls >= max_rolls"
+    then: [{stop: "no six in {rolls} rolls"}]
