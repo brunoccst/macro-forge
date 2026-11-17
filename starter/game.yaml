@@ -1,0 +1,63 @@
+# The game this app plays: every game-specific value the generic parts of the app read.
+# This is the starter: a made-up game ("Pocket Quest") to copy and change for your own game.
+# The build bakes it into the app (GameProfile.kt), and it also ships in the macro pack, where
+# the logic pack reads it (logic/Game.kt).
+name: Pocket Quest
+app_name: Quest Macros
+tagline: Automation for Pocket Quest, on this phone
+about: >-
+  Automation for the mobile game Pocket Quest that runs on this phone: no PC and no root.
+  Macros read the game screen (screen capture) and tap for you (accessibility).
+# the Android package of the game, and its own activity (anything else in front of it from the
+# same package is a commercial)
+package: com.example.pocketquest
+activity: com.example.pocketquest.MainActivity
+# the GitHub repo (owner/name) that hosts this app's builds and macro packs
+repo: your-name/your-macro-app
+# the Android app's id (its package on the phone)
+application_id: starter.app
+# the game's own macro steps (logic pack): the Kotlin object implementing GamePlugin
+plugin: starter.logic.StarterPlugin
+
+safety:
+  # anywhere on screen: an offer to pay; never tapped
+  purchase_words: [purchase, insufficient, not enough, "buy "]
+  # anywhere on screen: premium currency; taps there need the user's OK
+  premium_words: [gem, gems]
+  # the purchase guard: while this template shows (the shop), macros may only tap shop_safe ones
+  shop_screen: shop_title
+  shop_close: shop_close_button
+  shop_safe: [shop_close_button, dialog_close_button]
+
+# how the app groups macros (a macro's group: and its folder in macros/), in tab order;
+# icon = one of the app's own drawn icons (res/drawable/ic_<icon>.xml)
+groups:
+  - {id: daily, title: Daily, icon: sun}
+  - {id: farm, title: Farming, icon: swords}
+  - {id: basic, title: Basic, icon: blocks}
+  - {id: other, title: Other, icon: puzzle}
+  - {id: custom, title: Custom, icon: wrench}
+
+# what Claude is told about the game through the phone connector (ClaudePrompt.kt)
+claude:
+  how_to_work:
+    - "walk moves the hero on the map."
+  premium_examples: gems
+  example_macro: count-taps
+  reward_example: Gold Coin x5
+  format:
+    - "  count: true          (a starter plugin step: adds 1 to the variable `count`)"
+
+# the run reports macros write (one per round): how the outcome card and Statistics show them
+# (RunStats.kt). A field is a switch (true/false), a number or a text, shown in this order.
+#   show:  the field in a report's line ({value} = its value; a switch shows it when on)
+#   total: its line in the totals: a switch counts the reports with it on, a number adds up
+#          (with of: "x of y"), a text counts each value ({Value} = the value, capitalised)
+#   card:  also a line on the outcome card when its total isn't 0
+reports:
+  title: Quest runs
+  fields:
+    - {key: quest, show: "{value}"}
+    - {key: seconds, duration: true}
+    - {key: coins, show: "coins {value}", total: Coins earned}
+    - {key: rare_drop, show: rare drop, total: Rare drops, card: Rare drop}

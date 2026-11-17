@@ -19,6 +19,12 @@ macro-forge is the generic part. A game app uses it and adds what is its own:
   capture, OCR, the phone connector, the UI, the updater, the macro runner) and the generic macro
   steps (`macroforge.logic`), which also ship on their own as a downloadable logic pack.
 
+- `starter/game.yaml` and `android/starter`: a made-up game ("Pocket Quest") and its app, with a
+  one-step game plugin (`starter.logic.StarterPlugin`). Copy them to start an app for your game.
+
+Build and test it here: `gradle -p android testDebugUnitTest assembleDebug logicPack` (Android
+SDK in `android/local.properties` or `ANDROID_HOME`).
+
 ## Using it in a game app
 
 Add this repository as a git submodule (for example at `core/`) and include the module in the

@@ -1,0 +1,22 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      # the core with the starter game: unit tests, the starter APK and the logic pack
+      - name: Unit tests (no device)
+        run: gradle -p android testDebugUnitTest --stacktrace
+      - name: Build the starter app and the logic pack
+        run: gradle -p android assembleDebug logicPack --stacktrace
