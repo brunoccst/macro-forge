@@ -1,0 +1,56 @@
+name: macro-pack
+# Reusable: a game app's macro pack (tools/macroforge_pack.py): checks every macro, builds
+# macros.zip and publishes it as the pre-release "macros-<branch>", which phones following that
+# branch install by themselves (MacroLibrary.kt). Runs the pack tool of the caller's own core
+# checkout (the submodule), so the tool matches the app's core.
+#
+#   jobs:
+#     pack:
+#       uses: <owner>/macro-forge/.github/workflows/macro-pack.yml@main
+#       permissions: {contents: write}
+#       with: {app_name: My App}
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: "The app's name, for the pre-release notes"
+        type: string
+        required: true
+      core_dir:
+        description: "Where the caller keeps macro-forge (its submodule)"
+        type: string
+        default: core
+      root:
+        description: "The game repo's folder with game.yaml and macros/"
+        type: string
+        default: .
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the pack
+        run: |
+          pip install pyyaml
+          python "${{ inputs.core_dir }}/tools/macroforge_pack.py" --root "${{ inputs.root }}" -o macros.zip --commit "$GITHUB_SHA" --branch "$GITHUB_REF_NAME"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macros
+          path: macros.zip
+      - name: Publish the pack
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+          APP: ${{ inputs.app_name }}
+        run: |
+          TAG="macros-$(echo "$BRANCH" | sed 's/[^A-Za-z0-9._-]/-/g')"
+          NOTES="Macro pack of \`$BRANCH\` (macros, templates, data) for the $APP app. Not an app release.
+          commit: $GITHUB_SHA"
+          gh release delete "$TAG" --cleanup-tag -y 2>/dev/null || true
+          gh release create "$TAG" macros.zip --prerelease --target "$GITHUB_SHA" \
+            --title "Macros: $BRANCH" --notes "$NOTES"

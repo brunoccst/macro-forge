@@ -1,0 +1,83 @@
+name: app-release
+# Reusable: a game app's release. Builds the signed release APK and publishes the GitHub Release
+# <version> with it (docs/releases/<version>.md, when there is one, goes above the generated
+# notes). Run by hand, the release creates the tag on this commit, on main only.
+#
+#   on:
+#     push: {tags: ["v*.*.*"]}
+#     workflow_dispatch: {inputs: {version: {required: true}}}
+#   jobs:
+#     release:
+#       uses: <owner>/macro-forge/.github/workflows/app-release.yml@main
+#       permissions: {contents: write}
+#       secrets: inherit
+#       with: {version: "${{ inputs.version || github.ref_name }}", apk_name: my-app.apk, app_name: My App}
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version tag, like v1.0.0"
+        type: string
+        required: true
+      apk_name:
+        description: "The APK's file name in the release (e.g. my-app.apk)"
+        type: string
+        required: true
+      app_name:
+        description: "The app's name, for the release title"
+        type: string
+        required: true
+      android_dir:
+        type: string
+        default: android
+      app_dir:
+        type: string
+        default: android/app
+    secrets:
+      ANDROID_KEYSTORE_B64:
+        required: true
+      ANDROID_KEYSTORE_PASSWORD:
+        required: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.version }}
+    steps:
+      - name: Check the version
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "::error::'$TAG' is not a version like v1.0.0"; exit 1; fi
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$GITHUB_REF_NAME" != main ]; then echo "::error::run it on main"; exit 1; fi
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then echo "::error::ANDROID_KEYSTORE_B64 secret is required for releases"; exit 1; fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.p12"
+          echo "ANDROID_KEYSTORE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+      - name: Build release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          export VERSION_NAME="${TAG#v}"
+          export VERSION_CODE=$(( ($(date +%s) - 1735689600) / 60 ))
+          gradle -p "${{ inputs.android_dir }}" assembleRelease --stacktrace
+          cp "${{ inputs.app_dir }}/build/outputs/apk/release/app-release.apk" "${{ inputs.apk_name }}"
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APP: ${{ inputs.app_name }}
+        run: |
+          notes="docs/releases/$TAG.md"
+          if [ -f "$notes" ]; then extra=(--notes-file "$notes"); else extra=(); fi
+          gh release create "$TAG" "${{ inputs.apk_name }}" --target "$GITHUB_SHA" --title "$APP $TAG" --generate-notes "${extra[@]}"
