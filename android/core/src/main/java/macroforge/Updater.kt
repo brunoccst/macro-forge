@@ -407,6 +407,14 @@ object Updater {
                 }
                 else -> {
                     val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+                    // a late failure for the build that is already running (a second install of the
+                    // same version, seen right after a successful one): the update worked, so it must
+                    // not cancel bringing capture and the connector back, nor mark the build blocked
+                    val installing = context.getSharedPreferences("updates", Context.MODE_PRIVATE).getString("installing_version", null)
+                    if (installing != null && installing == BuildConfig.VERSION_NAME) {
+                        MacroLog.i("ignored a late install result for $installing ($status: $message): it is already installed")
+                        return
+                    }
                     MacroLog.e("update failed ($status): $message")
                     report(context, "Update failed: ${message ?: "status $status"}", active = false)
                     // whatever went wrong, the app was not replaced: nothing may be pressed or resumed later
