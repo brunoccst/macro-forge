@@ -23,6 +23,14 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
     private val vars = HashMap<String, Any?>()
     private var lastView: Mat? = null
     private var game = plugin.newRun()
+    // signs that a commercial is over (ad_left(), screen_still(), ad_warning())
+    private val adBar = AdSigns.Bar()
+    private var countdownDue = -1.0
+    private var stillView: Mat? = null
+    private var stillSince = 0.0
+    // the screen's text (OCR) for this frame: every text_has() of one pass shares one read
+    private var text: List<Ocr.Line>? = null
+    private var textOf: Frame? = null
 
     /** What the plugin's steps see of this macro run. */
     private fun macro(c: Context) = object : GamePlugin.Macro {
@@ -36,6 +44,9 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
     override fun setup(ctx: Context) {
         vars.clear()
         lastView?.release(); lastView = null
+        stillView?.release(); stillView = null
+        adBar.reset(); countdownDue = -1.0; stillSince = 0.0
+        text = null; textOf = null
         game = plugin.newRun()
         for ((k, v) in ctx.params) vars[k] = FlowScenario.typed(v)
         runActions(ctx, list(spec["setup"]))
@@ -50,6 +61,8 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
     }
 
     private fun runAction(ctx: Context, a: Map<String, Any?>) {
+        // anything but bookkeeping may change the screen: read its text again next time
+        if (a.keys.none { it in BOOKKEEPING }) textOf = null
         when {
             "if" in a -> runActions(ctx, list(if (truthy(ctx, a["if"])) a["then"] else a["else"]))
             "tap" in a -> when (val t = a["tap"]) {
@@ -122,6 +135,70 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
         return m > 4.0
     }
 
+    /** The screen's text, read once per frame (and again after any step that may change it). */
+    private fun texts(ctx: Context): List<Ocr.Line> {
+        val f = ctx.frame
+        text?.let { if (f != null && f === textOf) return it }
+        return ctx.readText().also { text = it; textOf = f }
+    }
+
+    /**
+     * Where the picture is across the frame: a portrait commercial shows pillar-boxed in the
+     * landscape capture (black on both sides), so its bar is in the middle column.
+     */
+    private fun picture(g: Mat): Pair<Int, Int> {
+        val cols = Mat()
+        Core.reduce(g, cols, 0, Core.REDUCE_AVG, org.opencv.core.CvType.CV_32F)
+        val w = g.cols()
+        val means = FloatArray(w)
+        cols.get(0, 0, means)
+        cols.release()
+        val x0 = means.indexOfFirst { it > 6f }.coerceAtLeast(0)
+        return if (x0 > w * 0.08 && x0 < w * 0.45) x0 to w - x0 else 0 to w
+    }
+
+    /** Seconds until the commercial on screen is over (0: it is), from its progress bar or countdown text; -1: no sign. */
+    private fun adLeft(ctx: Context): Double {
+        val now = System.currentTimeMillis() / 1000.0
+        val bar = ctx.frame?.gray?.let { g ->
+            val (x0, x1) = picture(g)
+            val h = g.rows()
+            val band = (h * 0.2).toInt()
+            val buf = ByteArray(x1 - x0)
+            val rows = ((0 until band) + (h - band until h)).map { y ->
+                g.get(y, x0, buf)
+                y to IntArray(buf.size) { buf[it].toInt() and 0xff }
+            }
+            adBar.update(now, rows)
+        } ?: -1.0
+        // "Reward in 12 seconds": remembered, since the text goes once it is over
+        val cd = AdSigns.countdown(texts(ctx).map { it.text })
+        if (cd >= 0) countdownDue = now + cd + 1
+        else if (countdownDue > 0 && now - countdownDue > 15) countdownDue = -1.0
+        val byText = if (countdownDue > 0) (countdownDue - now).coerceAtLeast(0.0) else -1.0
+        return listOf(bar, byText).filter { it >= 0 }.minOrNull() ?: -1.0
+    }
+
+    /** Seconds the picture hasn't changed (a commercial's video over, its end card up); 0 when it just did. */
+    private fun screenStill(ctx: Context): Double {
+        val now = System.currentTimeMillis() / 1000.0
+        val g = ctx.frame?.gray ?: return 0.0
+        // the left 80 %: our own floating buttons and log line are at the right
+        val roi = g.submat(Rect(0, 0, (g.cols() * 0.8).toInt(), g.rows()))
+        val small = Mat()
+        Imgproc.resize(roi, small, Size(64.0, 36.0), 0.0, 0.0, Imgproc.INTER_AREA)
+        roi.release()
+        val prev = stillView
+        stillView = small
+        if (prev == null) { stillSince = now; return 0.0 }
+        val diff = Mat()
+        Core.absdiff(small, prev, diff)
+        val m = Core.mean(diff).`val`[0]
+        diff.release(); prev.release()
+        if (m > 1.5) stillSince = now
+        return now - stillSince
+    }
+
     // --- values --------------------------------------------------------------------
     private fun env(ctx: Context): Expr.Env {
         val macro = name
@@ -146,12 +223,12 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
             "view_moved" -> viewMoved(ctx)
             "now" -> System.currentTimeMillis() / 1000.0
             // on-screen text (OCR) contains this, loosely (case and punctuation ignored)
-            "text_has" -> Ocr.norm(Expr.str(args[0])).let { want -> ctx.readText().any { Ocr.norm(it.text).contains(want) } }
+            "text_has" -> Ocr.norm(Expr.str(args[0])).let { want -> texts(ctx).any { Ocr.norm(it.text).contains(want) } }
             // the text on screen (OCR), optionally only between heights y0..y1, for a log line (e.g. what a reward was)
             "screen_text" -> {
                 val y0 = if (args.isNotEmpty()) Expr.num(args[0]) else 0.0
                 val y1 = if (args.size > 1) Expr.num(args[1]) else 1.0
-                ctx.readText().filter { it.center.y in y0..y1 }.joinToString(" ") { it.text }.take(160)
+                texts(ctx).filter { it.center.y in y0..y1 }.joinToString(" ") { it.text }.take(160)
             }
             // a list row still to do: the height (0..1) of the top-most text line containing `anchor`
             // (between heights y0..y1) with no text containing `mark` on the same line, else -1.
@@ -161,13 +238,19 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
                 val mark = Ocr.norm(Expr.str(args[1]))
                 val y0 = if (args.size > 2) Expr.num(args[2]) else 0.0
                 val y1 = if (args.size > 3) Expr.num(args[3]) else 1.0
-                val lines = ctx.readText()
+                val lines = texts(ctx)
                 val marks = lines.filter { Ocr.norm(it.text).contains(mark) }.map { it.center.y }
                 lines.filter { it.center.y in y0..y1 && Ocr.norm(it.text).contains(anchor) }
                     .sortedBy { it.center.y }
                     .firstOrNull { l -> marks.none { kotlin.math.abs(it - l.center.y) < 0.025 } }
                     ?.center?.y ?: -1.0
             }
+            // a commercial's own signs that it is over (see AdSigns): seconds left by its progress bar
+            // or countdown text, 0 = over, -1 = no sign; how long the picture has been still (its end
+            // card); its "Close video? You will lose your reward" box
+            "ad_left" -> adLeft(ctx)
+            "screen_still" -> screenStill(ctx)
+            "ad_warning" -> AdSigns.forfeitWarning(texts(ctx).map { it.text })
             "pick" -> args[Expr.num(args[0]).toInt().coerceIn(1, args.size - 1)]
             "abs" -> kotlin.math.abs(Expr.num(args[0]))
             else -> throw IllegalArgumentException("$macro: unknown function $name()")
@@ -198,6 +281,9 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
 
     companion object {
         /** The generic steps: any game's macros can use them. Keep in step with [runAction]. */
+        /** Steps that never change the screen (the screen's text read before them still holds). */
+        private val BOOKKEEPING = setOf("if", "set", "log", "status", "count", "got", "stop", "reset_view")
+
         val STEPS = setOf("if", "tap", "tap_exact", "drag", "walk", "back", "home", "leave_ad", "force_close", "wait", "launch", "log",
             "status", "set", "count", "got", "stop", "repeat", "reset_view", "run")
     }
