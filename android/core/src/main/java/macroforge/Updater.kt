@@ -165,13 +165,86 @@ object Updater {
      * turning taps on later never starts screen capture by itself (the user turns it on).
      */
     fun resumePending(c: Context): Boolean {
+        // dev builds only: a release build never updates itself, so it never turns capture on by itself
+        if (BuildConfig.BRANCH.isEmpty()) return false
         val p = c.getSharedPreferences("updates", Context.MODE_PRIVATE)
         if (System.currentTimeMillis() >= p.getLong("resume_until", 0)) return false
         if (p.getString("installing_version", null) == BuildConfig.VERSION_NAME) return true
         clearResume(c)
         return false
     }
-    fun clearResume(c: Context) = c.getSharedPreferences("updates", Context.MODE_PRIVATE).edit().remove("resume_until").remove("auto_confirm_until").apply()
+    fun clearResume(c: Context) {
+        c.getSharedPreferences("updates", Context.MODE_PRIVATE).edit()
+            .remove("resume_until").remove("auto_confirm_until").remove("capture_tries").remove("restore_asked").apply()
+        cancelRestoreNotice(c)
+    }
+
+    /** How long after the install starts the new build may still bring capture back by itself. */
+    const val RESUME_WINDOW_MS = 10 * 60_000L
+
+    /** How many times the restarted app asks for screen capture by itself before it asks the user. */
+    const val CAPTURE_TRIES = 3
+
+    /** One more automatic screen-capture request after an update; false once [CAPTURE_TRIES] are used. */
+    fun nextCaptureTry(c: Context): Boolean {
+        val p = c.getSharedPreferences("updates", Context.MODE_PRIVATE)
+        val n = p.getInt("capture_tries", 0)
+        if (n >= CAPTURE_TRIES) return false
+        p.edit().putInt("capture_tries", n + 1).apply()
+        return true
+    }
+
+    /**
+     * The automatic tries after an update failed: stop pressing anything, and leave a notification the
+     * user taps to allow screen capture themselves. Once they do, the connector comes back too
+     * ([restoreAsked]).
+     */
+    fun askUserToRestore(c: Context) {
+        c.getSharedPreferences("updates", Context.MODE_PRIVATE).edit()
+            .remove("resume_until").remove("auto_confirm_until").remove("capture_tries")
+            .putBoolean("restore_asked", true).apply()
+        MacroLog.i("screen capture didn't come back by itself after the update: tap the notification to allow it")
+        restoreNotice(c, "Screen capture is off after the update", "Tap to turn it back on (the connector comes back with it)")
+    }
+
+    /** The user was asked (notification) to allow capture after an update: the connector follows it. */
+    fun restoreAsked(c: Context) = BuildConfig.BRANCH.isNotEmpty() &&
+        c.getSharedPreferences("updates", Context.MODE_PRIVATE).getBoolean("restore_asked", false)
+
+    private const val RESTORE_NOTIFICATION_ID = 8
+
+    /** A notification that opens the app and asks for screen capture (a tap the user makes, so the dialog is theirs). */
+    fun restoreNotice(c: Context, title: String, text: String) = runCatching {
+        val nm = c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(CHANNEL) == null) {
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, "App updates", NotificationManager.IMPORTANCE_LOW))
+        }
+        val open = PendingIntent.getActivity(c, RESTORE_NOTIFICATION_ID,
+            Intent(c, MainActivity::class.java).putExtra(MainActivity.EXTRA_RESTORE_CAPTURE, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val b = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(c, CHANNEL) else @Suppress("DEPRECATION") Notification.Builder(c)
+        b.setSmallIcon(android.R.drawable.ic_menu_camera).setContentTitle(title).setContentText(text)
+            .setContentIntent(open).setAutoCancel(true)
+        nm.notify(RESTORE_NOTIFICATION_ID, b.build())
+    }
+
+    fun cancelRestoreNotice(c: Context) {
+        runCatching { (c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(RESTORE_NOTIFICATION_ID) }
+    }
+
+    /**
+     * The app was just replaced (MY_PACKAGE_REPLACED). After an unattended dev update, leave a
+     * notification at once: the accessibility service normally brings capture back within seconds and
+     * removes it, and if it can't (taps were turned off, the dialog was missed), one tap does it.
+     */
+    class Replaced : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED || !resumePending(context)) return
+            MacroLog.i("updated to ${BuildConfig.VERSION_NAME}: bringing screen capture and the connector back")
+            restoreNotice(context, "Updated to ${BuildConfig.VERSION_NAME}", "Turning screen capture back on… tap here if it doesn't come back")
+        }
+    }
 
     /**
      * Until when (ms) the accessibility service may press the installer's Update and Play Protect's
@@ -213,12 +286,13 @@ object Updater {
             return "the phone doesn't let ${GameProfile.current.appName} install apps yet: the user must allow \"Install unknown apps\" for it once (the settings page is open on the phone)"
         }
         // the user started it: every dialog and screen capture afterwards is theirs to answer
-        val until = if (userStarted) 0L else System.currentTimeMillis() + 4 * 60_000L
+        val until = if (userStarted) 0L else System.currentTimeMillis() + RESUME_WINDOW_MS
         c.getSharedPreferences("updates", Context.MODE_PRIVATE).edit()
             .putLong("resume_until", until)
             .putLong("auto_confirm_until", until)
             .putString("installing_version", r.version)
             .putBoolean("resume_connector", PhoneConnector.isOn)
+            .remove("capture_tries").remove("restore_asked")
             .apply()
         downloadAndInstall(c, r)
         return "installing ${r.version} (was ${BuildConfig.VERSION_NAME}): the app restarts, turns screen capture and the connector back on by itself and opens the game (about a minute)"
@@ -293,6 +367,12 @@ object Updater {
         }
         MacroLog.i("installing update ${release.version} (${file.length() / 1_000_000} MB)")
         report(context, "Installing ${release.version}…", -1)
+        // the window counts from here, not from the download's start (a slow download used it up)
+        val prefs = context.getSharedPreferences("updates", Context.MODE_PRIVATE)
+        if (prefs.getLong("resume_until", 0) > System.currentTimeMillis()) {
+            val until = System.currentTimeMillis() + RESUME_WINDOW_MS
+            prefs.edit().putLong("resume_until", until).putLong("auto_confirm_until", until).apply()
+        }
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(context.packageName)
