@@ -46,6 +46,8 @@ object RunStats {
         val step: String? = null,
         /** The last screen it recognised ("macro: screen"). */
         val screen: String? = null,
+        /** The screenshot saved when it got stuck or failed ([StuckShots] file name), if any. */
+        val shot: String? = null,
     ) {
         val ms get() = (end - start).coerceAtLeast(0)
         val outcome get() = classify(reason)
@@ -93,6 +95,7 @@ object RunStats {
         if (r.items.isNotEmpty()) m["items"] = r.items
         if (!r.step.isNullOrEmpty()) m["step"] = r.step
         if (!r.screen.isNullOrEmpty()) m["screen"] = r.screen
+        if (!r.shot.isNullOrEmpty()) m["shot"] = r.shot
         return json.writeValueAsString(m)
     }
 
@@ -111,6 +114,7 @@ object RunStats {
             items = (m["items"] as? Map<String, Any?>).orEmpty().mapNotNull { (k, v) -> (v as? Number)?.let { k to it.toInt() } }.toMap(),
             step = m["step"]?.toString(),
             screen = m["screen"]?.toString(),
+            shot = m["shot"]?.toString(),
         )
     }.getOrNull()
 

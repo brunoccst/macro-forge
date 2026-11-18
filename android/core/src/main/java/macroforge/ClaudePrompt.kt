@@ -37,7 +37,7 @@ When the user asks for a macro, build it in the YAML format below, save it with 
 - Capture the stable parts of each screen with save_template (a small box around a label or icon, no numbers, no moving parts, no player names) and use them by name.
 - Positions in macros are fractions of the screen (0..1), not pixels: divide your pixel coordinates by $width and $height.
 - Keep macros short and readable, with a comment line at the top, a description, a group (${game.groups.map { it.id }.filter { it != "basic" && it != "custom" }.joinToString(", ")}) and params for anything the user may want to change.
-- After a trial run, read the stop reason in macro_status and fix what failed.
+- After a trial run, read the stop reason in macro_status and fix what failed. When a macro got stuck or failed, stuck_screenshot shows the screen it stopped on (an unknown popup, for example).
 
 ${macroFormat(game)}
 """.trimIndent()

@@ -62,6 +62,7 @@ object RunSummary {
         val lines = ArrayList<String>()
         lines += (if (o == RunStats.Outcome.DONE) "Result: " else "Why: ") + r.reason
         if (o != RunStats.Outcome.DONE) lines += where(r)
+        r.shot?.let { lines += shotLine(it) }
         lines += body(listOf(r))
         return Outcome(title, o == RunStats.Outcome.DONE || o == RunStats.Outcome.STOPPED, lines, r.macro)
     }
@@ -83,7 +84,10 @@ object RunSummary {
         for (m in missing) lines += "✕ $m: unknown macro (update the macros)"
         if (end.startsWith("safety stop")) lines += "The remaining steps were skipped after the safety stop."
         if (skipping != null && skipped.isNotEmpty()) lines += "Skipped (${skipping}): " + skipped.joinToString { pretty(it) }
-        for (s in bad.filter { it.outcome != RunStats.Outcome.STOPPED }) lines += "${pretty(s.macro)} — " + where(s).removePrefix("Where: ")
+        for (s in bad.filter { it.outcome != RunStats.Outcome.STOPPED }) {
+            lines += "${pretty(s.macro)} — " + where(s).removePrefix("Where: ")
+            s.shot?.let { lines += shotLine(it) }
+        }
         lines += body(steps)
         return Outcome(title, bad.none { it.outcome != RunStats.Outcome.STOPPED } && missing.isEmpty() && skipping == null, lines, routine)
     }
@@ -93,6 +97,9 @@ object RunSummary {
         RunStats.Outcome.STOPPED -> "■"
         else -> "✕"
     }
+
+    /** The screenshot saved when it stopped ([StuckShots]). */
+    private fun shotLine(name: String) = "Screenshot: $name (Claude can look at it with stuck_screenshot)"
 
     /** Where a run was when it ended: its last step (the live log's words) and screen. */
     private fun where(r: RunStats.Record): String {

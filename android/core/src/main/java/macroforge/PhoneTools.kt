@@ -311,6 +311,24 @@ class PhoneTools(
         return ToolResult("$head\n${screenState(black)}$warn$newsText\n\nlast log lines:\n$log")
     }
 
+    /**
+     * A screenshot the app saved when a macro got stuck or failed ([StuckShots]): the one named, or
+     * the newest; with the list of the others.
+     */
+    fun stuckScreenshot(input: Map<String, Any?>): ToolResult {
+        val dir = StuckShots.dir(app.filesDir)
+        val shots = StuckShots.list(dir)
+        if (shots.isEmpty()) return ToolResult("no screenshots saved yet: one is saved each time a macro gets stuck, fails or makes a safety stop")
+        val want = input["name"]?.toString()?.trim().orEmpty()
+        val shot = if (want.isEmpty()) shots.first() else shots.firstOrNull { it.name == want || it.name == "$want.jpg" }
+            ?: return ToolResult("no saved screenshot named $want; saved:\n" + shots.joinToString("\n") { StuckShots.describe(it) }, isError = true)
+        val bytes = StuckShots.read(dir, shot.name) ?: return ToolResult("could not read ${shot.name}", isError = true)
+        val others = shots.filter { it != shot }
+        val text = "This is ${StuckShots.describe(shot)}. It is a saved picture of that moment, not the screen now." +
+            if (others.isEmpty()) "" else "\n\nother saved screenshots (newest first; pass a name to see one):\n" + others.joinToString("\n") { StuckShots.describe(it) }
+        return ToolResult(text, android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
+    }
+
     fun stopMacro(): ToolResult {
         if (!Runner.isRunning) return ToolResult("no macro running")
         Runner.requestStop()

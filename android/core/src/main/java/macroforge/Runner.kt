@@ -523,15 +523,38 @@ object Runner {
             changed()
         }
         MacroLog.i("stopped: $reason — ${scenario.summary(ctx.stats)}")
+        val step = MacroLog.status.ifEmpty { null }
+        // stuck, failed or a safety stop: keep the screen as it is now, to see afterwards what stopped it
+        val shot = if (StuckShots.wanted(reason)) saveStuckShot(capture, app, scenario.name, reason, step, lastScreen) else null
         val record = RunStats.Record(scenario.name, startedAt, System.currentTimeMillis(), reason, HashMap(ctx.stats),
             runCatching { RunStats.reportsSince(app.filesDir, reportsMark) }.getOrDefault(emptyList()), source, routine,
-            LinkedHashMap(ctx.items), MacroLog.status.ifEmpty { null }, lastScreen)
+            LinkedHashMap(ctx.items), step, lastScreen, shot)
         runCatching { RunStats.record(record) }.onFailure { MacroLog.e("could not save the run's statistics", it) }
         // the outcome message: once at the end (a routine shows one for all its steps when it ends)
         // (runs Claude started: the text goes to macro_status, and the card would cover its screenshots)
         if (routine == null) runCatching { RunSummary.finished(app, RunSummary.of(record), show = source != "connector") }.onFailure { MacroLog.e("could not show the outcome", it) }
         return reason
     }
+
+    /** The screen now as a JPEG the size of the connector's screenshots, saved as a [StuckShots] shot; its file name. */
+    private fun saveStuckShot(capture: Capture, app: android.content.Context, macro: String, reason: String,
+                              step: String?, screen: String?): String? = runCatching {
+        val bgr = LiveLog.without { capture.grabColor() } ?: throw IllegalStateException("no screen capture")
+        val f = minOf(1.0, STUCK_SHOT_MAX.toDouble() / maxOf(bgr.cols(), bgr.rows()))
+        val out = org.opencv.core.Mat()
+        if (f < 1.0) org.opencv.imgproc.Imgproc.resize(bgr, out, org.opencv.core.Size(bgr.cols() * f, bgr.rows() * f), 0.0, 0.0,
+            org.opencv.imgproc.Imgproc.INTER_AREA) else bgr.copyTo(out)
+        val buf = org.opencv.core.MatOfByte()
+        org.opencv.imgcodecs.Imgcodecs.imencode(".jpg", out, buf, org.opencv.core.MatOfInt(org.opencv.imgcodecs.Imgcodecs.IMWRITE_JPEG_QUALITY, 75))
+        val bytes = buf.toArray()
+        buf.release(); out.release(); bgr.release()
+        val shot = StuckShots.save(StuckShots.dir(app.filesDir), bytes, macro, reason, step, screen)
+        MacroLog.i("screenshot of where it stopped saved: ${shot.name}")
+        shot.name
+    }.onFailure { MacroLog.e("could not save the screenshot of where it stopped", it) }.getOrNull()
+
+    /** The longest side of a [StuckShots] screenshot: the connector's screenshot size, so its coordinates fit. */
+    private const val STUCK_SHOT_MAX = 1024
 
     /**
      * Run [sub] inside the running macro (Flow's `run:` step) and return its stop reason, for the
