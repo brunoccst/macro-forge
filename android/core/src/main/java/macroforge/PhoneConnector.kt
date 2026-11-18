@@ -206,7 +206,7 @@ object PhoneConnector {
     }
 
     /** Tools that don't need the screen on (macro files, updates). */
-    private val NO_SCREEN = setOf("list_templates", "list_macros", "read_macro", "save_macro", "delete_macro", "update_app", "update_macros")
+    private val NO_SCREEN = setOf("list_templates", "list_macros", "read_macro", "save_macro", "delete_macro", "update_app", "update_macros", "stuck_screenshot")
 
     /** Tools that touch the screen: not while a macro is driving it. */
     private val DRIVES = setOf("tap", "swipe", "back", "walk", "launch_game")
@@ -238,6 +238,7 @@ object PhoneConnector {
                 "start_macro" -> t.startMacro(a)
                 "macro_status" -> t.macroStatus(a)
                 "stop_macro" -> t.stopMacro()
+                "stuck_screenshot" -> t.stuckScreenshot(a)
                 "save_template" -> t.saveTemplate(a)
                 "save_macro" -> t.saveMacro(a["yaml"]?.toString().orEmpty())
                 "delete_macro" -> t.deleteMacro(a)
@@ -333,6 +334,8 @@ object PhoneConnector {
             mapOf("lines" to mapOf("type" to "integer", "description" to "how many of the last log lines (default 15, up to 600)"),
                 "find" to str("only log lines containing this text (case ignored)"))),
         McpServer.McpTool("stop_macro", "Stop the running macro.", emptyMap()),
+        McpServer.McpTool("stuck_screenshot", "The screenshot the app saved when a macro got stuck, failed or made a safety stop (the screen at that moment, also for scheduled runs nobody watched), with the macro, the reason and where it was; the newest one, or the one named. Also lists the other saved ones. macro_status outcomes name the file.",
+            mapOf("name" to str("file name from macro_status or the list, e.g. 20261118-150412-start-game.jpg (default: the newest)"))),
         McpServer.McpTool("save_template", "Save a small box of the current screen as a named template (a stable label or icon, no numbers or moving parts), usable in macros by name.",
             mapOf("name" to str("lowercase letters, digits and _, e.g. quest_board_title"), "region" to box(), "notes" to str("what it is")), listOf("name", "region")),
         McpServer.McpTool("save_macro", "Save a custom macro (YAML in the app's macro format), listed under Custom, replacing the custom macro with that name. Use it for drafts and exceptional one-offs: a macro that fits a library category (one of the game's groups, or basic) is published to the GitHub repo once it works, for every user. Library macros can't be replaced here: change them in the repo.",

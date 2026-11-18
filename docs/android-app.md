@@ -48,8 +48,12 @@ user's relay, a small Cloudflare Worker on their own account ([relay/README.md](
   without tool calls, and maps the connector's tools (screenshot, zoom, tap, swipe, back, wait,
   walk, read_text, find_template, list_templates, list_macros, read_macro, start_macro,
   macro_status, stop_macro, save_template, save_macro, launch_game, floating_controls,
-  wake_screen, update_app, update_macros, delete_macro) onto `PhoneTools`. tap and swipe fold
-  the floating buttons first when their window covers the point.
+  wake_screen, update_app, update_macros, delete_macro, stuck_screenshot) onto `PhoneTools`. tap
+  and swipe fold the floating buttons first when their window covers the point.
+- `StuckShots.kt`: when a macro gets stuck, fails with an error or makes a safety stop, the runner
+  saves the screen it stopped on (a 1024 px JPEG plus a note: macro, reason, step, last screen) in
+  the app's own storage, newest 20 kept. The outcome message names the file and `stuck_screenshot`
+  shows it to Claude, also for scheduled runs nobody watched. Never uploaded anywhere else.
 - `ScreenWake.kt`: turns the screen on and keeps it on while Claude or a macro drives the game.
   An all-black capture is never taken for "the game isn't in front": screenshots say so, taps on
   a black frame are refused, and a macro stops after 2 minutes of black.
