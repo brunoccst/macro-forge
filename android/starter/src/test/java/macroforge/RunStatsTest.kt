@@ -13,6 +13,7 @@ class RunStatsTest {
     @Test fun classifiesStopReasons() {
         assertEquals(RunStats.Outcome.STOPPED, RunStats.classify("stop requested"))
         assertEquals(RunStats.Outcome.ERROR, RunStats.classify("error: IllegalStateException: boom"))
+        assertEquals(RunStats.Outcome.ERROR, RunStats.classify("failed: a commercial did not close"))
         assertEquals(RunStats.Outcome.SAFETY, RunStats.classify("safety stop: the shop or a purchase popup was on screen (no tap made there)"))
         assertEquals(RunStats.Outcome.STUCK, RunStats.classify("stuck on an unrecognised screen for 45s"))
         assertEquals(RunStats.Outcome.DONE, RunStats.classify("Forest Quest done — 13m 25s; chests 7/7"))

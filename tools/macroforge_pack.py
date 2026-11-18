@@ -214,6 +214,11 @@ def check(root: Path) -> list[str]:
         for acts in (spec.get("handlers") or {}).values():
             used += _runs(acts)
         used += [str(s) for s in spec.get("steps") or []]
+        # a routine's required: / always: name some of its own steps (see the app's Routine.kt)
+        for key in ("required", "always"):
+            for s in spec.get(key) or []:
+                if str(s) not in {str(x) for x in spec.get("steps") or []}:
+                    problems.append(f"{rel}: {key}: {s!r} is not one of its steps")
         used += [str(s) for s in spec.get("uses") or []]
         # a set: value is an expression: an empty one crashes the macro on the phone ('' is the empty text)
         for acts in [spec.get("setup"), spec.get("unknown"), *(spec.get("handlers") or {}).values()]:

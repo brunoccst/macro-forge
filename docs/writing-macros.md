@@ -80,7 +80,7 @@ Actions (one key each):
 | `home: true`, `leave_ad: true` | Android Home; leave a commercial that won't close (no X, Back ignored): Home, then the game's own screen, which closes the commercial's activity (never tap inside a commercial) |
 | `force_close: true` | the last resort for such a commercial: force-close the game, i.e. swipe the game's own card away in recent apps (found by its name; nothing else there is touched), then Home; sets `closed` |
 | `log: "text {expr}"`, `status: "text {expr}"` | write to the log; `status` also shows on the live log line |
-| `set: {var: expr}`, `count: stat`, `stop: "reason"` | variables, counters, end the run |
+| `set: {var: expr}`, `count: stat`, `stop: "reason"` | variables, counters, end the run (`stop: "failed: why"` ends it as failed, like getting stuck: see Routines) |
 | `got: "reward text {expr}"` or `got: {item: "Name", n: expr}` | what the macro got (the items a reward text names, "Gold Coin x5"): shown in the outcome message at the end and kept on the Statistics page |
 | `if: expr` + `then:` / `else:`, `repeat: {times: expr, do: [...]}` | control flow |
 | `run: macro` / `run: {macro, params, until}` | run another macro (basic macros are made for this), sets `result` |
@@ -105,6 +105,24 @@ may change it, such as `back`, `tap` or `wait`). The full,
 current list is the comment at the top of `android/core/src/main/java/macroforge/Flow.kt`.
 A new step written in Kotlin goes in `logic/FlowRun.kt` if any game could use it, else in the
 game's plugin (see [logic-pack.md](logic-pack.md)).
+
+### Routines: macros one after another
+
+A routine has `steps:` instead of screens and handlers. Each step is a macro that runs with its own
+saved options (and the routine's own settings for it). A step that fails doesn't stop the
+others, unless the routine marks it `required:`: when that one fails (it got stuck, crashed, or
+ended with `stop: "failed: ..."`), the steps after it are skipped, except the `always:` ones,
+and the outcome message says what was skipped. Use it for a step the rest can't do without,
+such as opening the app:
+
+```yaml
+name: daily-routine
+steps: [open-app, collect-gifts, watch-ads, close-app]
+required: [open-app]   # it failed: skip to close-app instead of letting every step time out
+always: [close-app]
+```
+
+A safety stop or ■ still ends the whole routine at once.
 
 ### "How it works": the steps in plain words
 

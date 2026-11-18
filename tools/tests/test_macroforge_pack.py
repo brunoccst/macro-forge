@@ -64,3 +64,15 @@ def test_options_follow_known_globals(tmp_path):
     assert any("unknown global 'speed'" in p for p in problems)
     assert not any("'team'" in p for p in problems)
     assert any("global 'bad': default" in p for p in problems)
+
+
+def test_routine_required_and_always_name_its_steps(tmp_path):
+    _game(tmp_path)
+    (tmp_path / "macros" / "basic").mkdir(parents=True)
+    for n in ("a", "b"):
+        (tmp_path / "macros" / "basic" / f"{n}.yaml").write_text(f"name: {n}\ngroup: basic\nhow: [x]\n")
+    (tmp_path / "macros" / "basic" / "r.yaml").write_text(
+        "name: r\ngroup: basic\nsteps: [a, b]\nrequired: [a]\nalways: [c]\n")
+    problems = mp.check(tmp_path)
+    assert any("always: 'c' is not one of its steps" in p for p in problems)
+    assert not any("required:" in p for p in problems)

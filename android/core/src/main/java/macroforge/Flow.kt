@@ -72,6 +72,13 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
     override val screens: List<String> = list(spec["screens"]).map { it.toString() }
     /** A routine: other macros run one after another (steps: [start-game, daily-ads, ...]). */
     val steps: List<String> = list(spec["steps"]).map { it.toString() }
+    /**
+     * A routine's steps the rest depends on (`required: [start-game]`): when one of them fails
+     * ([Routine.failed]), the steps after it are skipped, except the [always] ones.
+     */
+    val required: Set<String> = list(spec["required"]).map { it.toString() }.toSet()
+    /** A routine's steps that still run after a required step failed (`always: [stop-game]`). */
+    val always: Set<String> = list(spec["always"]).map { it.toString() }.toSet()
     override val unknownTimeoutS = (spec["unknown_timeout_s"] as? Number)?.toDouble() ?: 45.0
     val screenDefs: Map<String, ScreenDef> = map(spec["define_screens"]).entries.associate { (k, v) ->
         val m = mapOrNull(v)

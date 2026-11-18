@@ -68,11 +68,14 @@ object RunSummary {
     }
 
     /** The outcome of a routine: each step's result, then everything its steps got. */
-    fun ofRoutine(routine: String, steps: List<RunStats.Record>, missing: List<String>, end: String, ms: Long): Outcome {
+    fun ofRoutine(routine: String, steps: List<RunStats.Record>, missing: List<String>, end: String, ms: Long,
+                  /** The steps skipped after a required step failed ([Routine]), and why. */
+                  skipped: List<String> = emptyList(), skipping: String? = null): Outcome {
         val bad = steps.filter { it.outcome != RunStats.Outcome.DONE }
         val name = pretty(routine)
         val title = when {
             end == "stop requested" -> "$name stopped by you"
+            skipping != null -> "$name stopped early"
             bad.isEmpty() && missing.isEmpty() -> "$name finished"
             else -> "$name finished with problems"
         } + " (${steps.size} step(s), ${RunStats.duration(ms)})"
@@ -80,12 +83,13 @@ object RunSummary {
         for (s in steps) lines += "${mark(s.outcome)} ${pretty(s.macro)}: ${s.reason}"
         for (m in missing) lines += "✕ $m: unknown macro (update the macros)"
         if (end.startsWith("safety stop")) lines += "The remaining steps were skipped after the safety stop."
+        if (skipping != null && skipped.isNotEmpty()) lines += "Skipped (${skipping}): " + skipped.joinToString { pretty(it) }
         for (s in bad.filter { it.outcome != RunStats.Outcome.STOPPED }) {
             lines += "${pretty(s.macro)} — " + where(s).removePrefix("Where: ")
             s.shot?.let { lines += shotLine(it) }
         }
         lines += body(steps)
-        return Outcome(title, bad.none { it.outcome != RunStats.Outcome.STOPPED } && missing.isEmpty(), lines, routine)
+        return Outcome(title, bad.none { it.outcome != RunStats.Outcome.STOPPED } && missing.isEmpty() && skipping == null, lines, routine)
     }
 
     private fun mark(o: RunStats.Outcome) = when (o) {

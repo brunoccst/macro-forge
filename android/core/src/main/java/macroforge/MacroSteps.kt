@@ -66,7 +66,16 @@ object MacroSteps {
         }
         val spec = macro.spec
         // a routine: its macros one after another, each with its own saved options
-        if (macro.steps.isNotEmpty()) return macro.steps.map { name -> callStep(name, emptyMap(), "", env, routine = true) }
+        // (a required step that fails skips the rest, except the always: ones; see Routine)
+        if (macro.steps.isNotEmpty()) return macro.steps.map { name ->
+            val step = callStep(name, emptyMap(), "", env, routine = true)
+            val rule = when {
+                name in macro.required -> "if it fails, the rest is skipped" + if (macro.always.isEmpty()) "" else " but ${macro.always.joinToString()}"
+                name in macro.always && macro.required.isNotEmpty() -> "runs even when a step before it failed"
+                else -> ""
+            }
+            if (rule.isEmpty()) step else step.copy(note = listOf(step.note, rule).filter { it.isNotEmpty() }.joinToString("; "))
+        }
         val how = spec["how"]
         if (how != null) return how(how, env, explain)
         // no how: the logic's own steps it uses, else the macros it runs
