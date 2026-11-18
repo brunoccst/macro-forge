@@ -121,15 +121,24 @@ class MacroService : Service() {
                 updateNotification("Stopped: $reason")
                 return@Thread
             }
-            // a routine: each macro in turn; a step that fails doesn't stop the rest (the last one turns the game off)
+            // a routine: each macro in turn; a step that fails doesn't stop the rest (the last one turns
+            // the game off), unless the routine marks it required: then only its always: steps still run
+            val flow = scenario as FlowScenario
             val results = ArrayList<String>()
             val missing = ArrayList<String>()
+            val skipped = ArrayList<String>()
+            var skipping: String? = null
             RunSummary.hide()
             val routineStart = System.currentTimeMillis()
             var routineEnd = "finished"
             try {
                 for ((i, step) in steps.withIndex()) {
-                    val sub = try { Scenarios.get(this, step) } catch (e: Exception) { results += "$step: unknown macro"; missing += step; continue }
+                    if (!Routine.runs(step, skipping, flow.always)) { skipped += step; results += "$step: skipped ($skipping)"; continue }
+                    val sub = try { Scenarios.get(this, step) } catch (e: Exception) {
+                        results += "$step: unknown macro"; missing += step
+                        if (skipping == null) skipping = Routine.skipAfter(step, null, flow.required)
+                        continue
+                    }
                     updateNotification("${scenario.name}: $step (${i + 1}/${steps.size})")
                     MacroLog.prefix = "${scenario.name} ${i + 1}/${steps.size}"
                     MacroLog.i("${scenario.name}: step ${i + 1}/${steps.size} $step")
@@ -138,6 +147,11 @@ class MacroService : Service() {
                     results += "$step: $reason"
                     if (reason == "stop requested") { routineEnd = reason; break }
                     if (reason.startsWith("safety stop")) { routineEnd = reason; MacroLog.i("${scenario.name}: safety stop, skipping the remaining steps"); break }
+                    if (skipping == null) Routine.skipAfter(step, reason, flow.required)?.let {
+                        skipping = it
+                        MacroLog.i("${scenario.name}: $it, skipping the remaining steps" +
+                            flow.always.filter { a -> a in steps.drop(i + 1) }.let { a -> if (a.isEmpty()) "" else " but ${a.joinToString()}" })
+                    }
                 }
             } finally {
                 MacroLog.prefix = ""
@@ -150,10 +164,14 @@ class MacroService : Service() {
                     steps.forEach { st -> st.items.forEach { (k, v) -> items[k] = (items[k] ?: 0) + v } }
                     val end = System.currentTimeMillis()
                     RunStats.record(RunStats.Record(scenario.name, routineStart, end,
-                        if (routineEnd == "finished") "finished ${results.size} step(s)" else routineEnd,
+                        when {
+                            routineEnd != "finished" -> routineEnd
+                            skipping != null -> "failed: $skipping, skipped ${skipped.joinToString()}"
+                            else -> "finished ${results.size} step(s)"
+                        },
                         counts, steps.flatMap { it.reports }, items = items))
                     // one outcome message for the whole routine, after its last step
-                    RunSummary.finished(this, RunSummary.ofRoutine(scenario.name, steps, missing, routineEnd, end - routineStart), show = source != "connector")
+                    RunSummary.finished(this, RunSummary.ofRoutine(scenario.name, steps, missing, routineEnd, end - routineStart, skipped, skipping), show = source != "connector")
                 }.onFailure { MacroLog.e("could not save the routine's statistics", it) }
             }
             MacroLog.i("${scenario.name} done — " + results.joinToString(" | "))
