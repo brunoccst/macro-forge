@@ -238,6 +238,17 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
                 val y1 = if (args.size > 1) Expr.num(args[1]) else 1.0
                 texts(ctx).filter { it.center.y in y0..y1 }.joinToString(" ") { it.text }.take(160)
             }
+            // the on-screen text after `marker` (case ignored; "" when it isn't there), optionally only
+            // between heights y0..y1: e.g. a mail's rewards after "The items below have been received",
+            // without its title (whose numbers aren't rewards)
+            "text_after" -> {
+                val marker = Expr.str(args[0])
+                val y0 = if (args.size > 1) Expr.num(args[1]) else 0.0
+                val y1 = if (args.size > 2) Expr.num(args[2]) else 1.0
+                val all = texts(ctx).filter { it.center.y in y0..y1 }.joinToString(" ") { it.text }
+                val at = all.indexOf(marker, ignoreCase = true)
+                if (at < 0) "" else all.substring(at + marker.length).trim().take(300)
+            }
             // a list row still to do: the height (0..1) of the top-most text line containing `anchor`
             // (between heights y0..y1) with no text containing `mark` on the same line, else -1.
             // E.g. text_row_without('utc', 'opened', 0.15, 0.85): the first inbox item not opened yet.

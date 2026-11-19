@@ -88,7 +88,7 @@ Actions (one key each):
 | any step of the game plugin | the game's own steps, written in Kotlin (game.yaml `plugin:`, see [game-profile.md](game-profile.md)) |
 
 Expressions can use the params, variables and `found('t')`, `captured('t')`, `text_has('s')`,
-`screen_text(y0, y1)`, `game_in_front()`, `ad_in_front()`, `game_screen()` (the game's own
+`screen_text(y0, y1)`, `text_after('marker', y0, y1)` (the text after a marker, e.g. a mail's rewards without its title), `game_in_front()`, `ad_in_front()`, `game_screen()` (the game's own
 activity in front: no commercial), `on_wifi()` (the phone is on Wi-Fi or another unmetered network), `view_moved()`, `now()`, `pick(i, a, b, ...)`, and three
 signs that a commercial has played to its end, so a macro can close it then instead of after a
 fixed time (logic/AdSigns.kt):
@@ -216,6 +216,6 @@ Tips for a good template:
   ignores what it covers. To read that corner, wrap the read in `LiveLog.without { }`. It shows
   `MacroLog.status`: give every real step one. In a YAML macro use `status: "text {expr}"`; in
   Kotlin call `MacroLog.status(...)` for a step and `MacroLog.show(...)` for a progress counter.
-  `screen_text(y0, y1)` returns the OCR text in a band of the screen; `text_row_without(anchor,
+  `screen_text(y0, y1)` returns the OCR text in a band of the screen (`text_after(marker, y0, y1)` only what follows `marker`); `text_row_without(anchor,
   mark, y0, y1)` finds a list row still to do (the top-most line with `anchor` and no `mark`).
   Never put account data in a log line.

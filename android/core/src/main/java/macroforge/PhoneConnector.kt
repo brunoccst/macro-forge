@@ -181,12 +181,22 @@ object PhoneConnector {
         val out = try {
             server(app)?.handle(body)
         } catch (t: Throwable) {
+            // answer with the error (e.g. a macro pack file that doesn't parse): no answer leaves
+            // Claude waiting until its call times out, with no clue why
             MacroLog.e("connector request failed", t)
-            null
+            failure(body, "the phone could not answer: ${t.javaClass.simpleName}: ${t.message?.take(300)}")
         }
         val reply = json.createObjectNode().put("id", id)
         if (out != null) reply.put("body", out) else reply.putNull("body")
         ws.send(json.writeValueAsString(reply))
+    }
+
+    /** A JSON-RPC error answer to [body] (null for a notification, which gets no answer). */
+    private fun failure(body: String, message: String): String? {
+        val id = runCatching { json.readTree(body).get("id") }.getOrNull()
+        if (id == null || id.isNull) return null
+        val err = json.createObjectNode().put("code", -32603).put("message", message)
+        return json.writeValueAsString(json.createObjectNode().put("jsonrpc", "2.0").set<com.fasterxml.jackson.databind.node.ObjectNode>("id", id).set<com.fasterxml.jackson.databind.node.ObjectNode>("error", err))
     }
 
     /** The MCP server over this capture (made again when the capture changes). */
