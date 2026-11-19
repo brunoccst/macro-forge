@@ -96,7 +96,11 @@ export class PhoneRelay {
     const r = await answer;
     if (r.timeout) return rpcError(body, "The phone didn't answer in time (it may be waiting for you to Allow or Deny a tap on the phone).");
     if (r.offline) return this.offline(body);
-    if (r.body === null || r.body === undefined || r.body === "") return new Response(null, { status: 202 });
+    if (r.body === null || r.body === undefined || r.body === "") {
+      // a request (not a notification) with no answer: say so, or Claude waits until it times out
+      if (!isNotification(body)) return rpcError(body, "The phone could not answer this request: see the macro app's log (System) for the error.");
+      return new Response(null, { status: 202 });
+    }
     if (rpcMethod(body) === "tools/list") {
       try {
         const tools = JSON.parse(r.body)?.result?.tools;
