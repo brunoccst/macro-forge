@@ -29,6 +29,7 @@ class PhoneTools(
     private val jpegQuality: Int = 80,
     private val confirmTimeoutMs: Long = 5 * 60_000L,
 ) {
+    // a broken template file only loses its own templates (LoadProblems): the tools keep working
     val library = Library.load(MacroLibrary.files(app), *templateFolders(app)).apply { addDir(Scenarios.userTemplates(app)) }
     val ctx = Context(capture, MacroLibrary.files(app), Vision(library), emptyMap(), stop)
     val shotW = minOf(shotMax, capture.width)
@@ -251,13 +252,20 @@ class PhoneTools(
             // taken over from the macros it runs: its own settings for them (unset = that macro's own)
             (if (inner.isEmpty()) "" else "\n  its own settings for the macros it runs: " +
                 inner.entries.joinToString("; ") { (m, keys) -> "$m.{${keys.joinToString(",") { it.substringAfter('.') }}}" })
-    })
+    } + problems())
+
+    /** The files that couldn't be loaded (each skipped on its own), for list_macros and macro_status. */
+    private fun problems(brokenOnly: Boolean = false): String {
+        MacroLibrary.checkOnce(app)
+        val all = if (brokenOnly) LoadProblems.broken() else LoadProblems.all()
+        return if (all.isEmpty()) "" else "\n\nfiles the app could not load (skipped; everything else works; tell the user, fix them in the repo):\n" + LoadProblems.describe(all)
+    }
 
     fun launchGame(): ToolResult { ctx.launchApp(ClaudeSafety.GAME); ctx.wait(4.0); return ToolResult("OK (the game may still be loading)") }
 
     private fun macro(input: Map<String, Any?>): Pair<Scenario, Map<String, String>> {
         val name = input["name"]?.toString().orEmpty()
-        val s = runCatching { Scenarios.get(app, name) }.getOrElse { throw IllegalArgumentException("unknown macro '$name' (see list_macros)") }
+        val s = runCatching { Scenarios.get(app, name) }.getOrElse { throw IllegalArgumentException("${it.message} (see list_macros)") }
         @Suppress("UNCHECKED_CAST")
         val given = (input["params"] as? Map<String, Any?>).orEmpty().mapValues { it.value.toString() }
         return s to given
@@ -309,7 +317,7 @@ class PhoneTools(
         // a black frame is the usual reason for "the game isn't in front" loops: say it plainly
         val black = capture.grab(0)?.let { f -> f.allBlack.also { f.gray.release() } }
         val warn = if (black == true || ScreenWake.isOn() == false) "\nWARNING: " + ScreenWake.blackReason(ScreenWake.isOn(), capture.frameAgeMs()) + " (wake_screen turns it on)" else ""
-        return ToolResult("$head\n${screenState(black)}\n${DailySchedule.status(app)}$warn$newsText\n\nlast log lines:\n$log")
+        return ToolResult("$head\n${screenState(black)}\n${DailySchedule.status(app)}$warn$newsText${problems(brokenOnly = true)}\n\nlast log lines:\n$log")
     }
 
     /**

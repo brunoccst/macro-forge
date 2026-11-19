@@ -62,9 +62,37 @@ object Logic {
 
     @Volatile private var pack: Loaded? = null
     @Volatile private var initialized = false
+    @Volatile private var app: Context? = null
 
     /** The logic the next macro run uses. */
     fun current(): Loaded = pack ?: bundled
+
+    /**
+     * The downloaded pack broke at runtime (its classes don't fit this app: a [LinkageError]):
+     * stop using it, so the built-in logic runs from now on and the
+     * app, the connector and the other macros keep working. The pack's commit is remembered so the
+     * same broken pack isn't loaded again ([rejected]); a newer one is.
+     */
+    internal fun packBroken(broken: Loaded, what: String, e: Throwable) {
+        synchronized(this) {
+            if (pack !== broken) return
+            pack = null
+            app?.let { c ->
+                File(dir(c), "current").deleteRecursively()
+                if (broken.commit.isNotEmpty()) c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(REJECTED, broken.commit).apply()
+            }
+        }
+        val msg = "the logic pack ${broken.source} broke ($what: ${e.javaClass.simpleName}: ${e.message}); using the built-in logic instead"
+        MacroLog.e("logic: $msg", e)
+        LoadProblems.report("logic pack", "logic", msg)
+        app?.let { c -> runCatching { PhoneEvents.init(c); PhoneEvents.add("problem", "Logic pack turned off", msg.replaceFirstChar { it.uppercase() }, ok = false) } }
+    }
+
+    /** The commit of a logic pack that broke on this phone: not loaded again (null: none). */
+    fun rejected(): String? = app?.getSharedPreferences(PREFS, Context.MODE_PRIVATE)?.getString(REJECTED, null)
+
+    private const val PREFS = "logic"
+    private const val REJECTED = "rejected_commit"
 
     /** Where the logic in use came from, for logs and Claude. */
     fun describe(): String = current().let { if (it === bundled) "built-in logic" else "logic pack ${it.source}" }
@@ -80,14 +108,20 @@ object Logic {
         synchronized(this) {
             if (initialized) return
             initialized = true
+            app = c.applicationContext ?: c
             val current = File(dir(c), "current")
             if (!File(current, "classes.dex").exists()) return
-            runCatching { pack = load(current) }
-                .onSuccess { MacroLog.i("logic: using the logic pack ${pack?.source}") }
-                .onFailure {
-                    MacroLog.e("logic: the installed logic pack can't be used (${it.message}); using the built-in logic")
-                    current.deleteRecursively()
-                }
+            // any Throwable: a pack that can't link throws Errors, and it must never stop the app
+            try {
+                pack = load(current)
+                MacroLog.i("logic: using the logic pack ${pack?.source}")
+            } catch (e: Throwable) {
+                if (e is VirtualMachineError && e !is StackOverflowError) throw e
+                val msg = "the installed logic pack can't be used (${e.javaClass.simpleName}: ${e.message}); using the built-in logic"
+                MacroLog.e("logic: $msg")
+                LoadProblems.report("logic pack", "logic", msg)
+                current.deleteRecursively()
+            }
         }
     }
 
@@ -107,8 +141,47 @@ object Logic {
         dex.setReadOnly()
         val loader = PackFirstLoader(dex.path, File(dir, "oat").apply { mkdirs() }, Logic::class.java.classLoader!!)
         val entry = Class.forName(ENTRY, true, loader).getDeclaredConstructor().newInstance() as LogicEntry
-        entry.actions // touch it: a pack that can't link fails here, not in a macro
-        return Loaded(entry, "${i.name} (${i.branch}@${i.commit.take(7)})", i.code, i.commit)
+        // touch it: a pack that can't link fails here, not in a macro
+        entry.actions; entry.stepUses
+        return Loaded(Guarded(entry), "${i.name} (${i.branch}@${i.commit.take(7)})", i.code, i.commit)
+    }
+
+    /**
+     * The pack's entry as the shell sees it: a call into the pack that throws a [LinkageError] (its
+     * classes don't fit this app: a missing method or class, a failed static init) turns the pack off ([packBroken]) and answers with the built-in logic, so
+     * one broken pack never breaks the app's pages, the connector or the macros. The engine a macro
+     * run gets is guarded the same way: that run fails with a clear reason, the next runs use the
+     * built-in logic. Ordinary exceptions of a macro's steps pass through (the macro fails on its own).
+     */
+    private class Guarded(private val inner: LogicEntry) : LogicEntry {
+        /** The pack this entry belongs to, while it is the one in use. */
+        private fun mine() = pack?.takeIf { it.entry === this }
+        private inline fun <T> call(what: String, fallback: () -> T, block: () -> T): T = try { block() } catch (e: LinkageError) {
+            mine()?.let { packBroken(it, what, e) }
+            fallback()
+        }
+
+        override val actions: Set<String> get() = call("actions", { bundled.entry.actions }) { inner.actions }
+        override val stepUses: Map<String, List<String>> get() = call("stepUses", { bundled.entry.stepUses }) { inner.stepUses }
+        override fun explain(action: String, arg: Any?, env: MacroSteps.Env) =
+            call("explain $action", { bundled.entry.explain(action, arg, env) }) { inner.explain(action, arg, env) }
+        override fun label(action: String, arg: Any?) = call("label $action", { bundled.entry.label(action, arg) }) { inner.label(action, arg) }
+        override fun engine(scenario: FlowScenario): FlowEngine {
+            val e = call("engine", { null }) { inner.engine(scenario) } ?: throw StopScenario(brokenRun())
+            return object : FlowEngine {
+                override fun setup(ctx: macroforge.Context) = step("setup") { e.setup(ctx) }
+                override fun onScreen(ctx: macroforge.Context, screen: String) = step("screen $screen") { e.onScreen(ctx, screen) }
+                override fun onUnknown(ctx: macroforge.Context) = step("unknown screen") { e.onUnknown(ctx) }
+            }
+        }
+
+        /** A step of a macro run: a LinkageError from the pack turns it off and stops this run with a clear reason. */
+        private inline fun step(what: String, block: () -> Unit) = try { block() } catch (e: LinkageError) {
+            mine()?.let { packBroken(it, what, e) }
+            throw StopScenario(brokenRun())
+        }
+
+        private fun brokenRun() = "error: the logic pack broke and was turned off (see macro_status); run the macro again: it uses the built-in logic now"
     }
 
     /**
@@ -149,6 +222,7 @@ object Logic {
         root.listFiles()?.filter { it.name.startsWith("old-") }?.forEach { it.deleteRecursively() }
         // reload from its final place: the loader must point at files that stay
         pack = runCatching { load(current) }.getOrElse { loaded }
+        LoadProblems.clear("logic pack")
         MacroLog.i("logic: now using the logic pack ${pack?.source}")
         return "loaded the logic pack ${pack?.source}: no app install needed, the next macro run uses it"
     }

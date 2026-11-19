@@ -145,7 +145,8 @@ object Updater {
             val release = Release(name, apk.getString("browser_download_url"), body, json.optString("html_url"), shell, logic)
             // a logic pack is new when it is another commit's (also an older one: the phone switched branch);
             // an app build only when it is newer
-            return if (release.logicOnly && commit.isNotEmpty()) release.takeIf { commit != Logic.current().commit }
+            // (not a pack that already broke on this phone: Logic.packBroken)
+            return if (release.logicOnly && commit.isNotEmpty()) release.takeIf { commit != Logic.current().commit && commit != Logic.rejected() }
             else if (code > Logic.code()) release else null
         } finally {
             conn.disconnect()

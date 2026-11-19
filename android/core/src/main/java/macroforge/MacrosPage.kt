@@ -243,8 +243,16 @@ class MacrosPage(private val a: MainActivity) {
         libraryInfo.text = listOf(
             if (inst == null) "No macros downloaded yet: the phone needs internet once."
             else "Installed: ${macros.count { !(it is FlowScenario && it.custom) }} macros from ${inst.branch}@${inst.commit.take(7)}, ${inst.built}.",
-            MacroLibrary.state, last,
+            MacroLibrary.state, last, brokenFiles(),
         ).filter { it.isNotBlank() }.distinct().joinToString("\n")
+    }
+
+    /** Files that couldn't be loaded: each is skipped on its own, the rest works. */
+    private fun brokenFiles(): String {
+        MacroLibrary.checkOnce(a)
+        val bad = LoadProblems.broken()
+        return if (bad.isEmpty()) "" else "${bad.size} file(s) couldn't be loaded and were skipped (the rest works): " +
+            bad.joinToString { it.file.substringAfterLast('/') }
     }
 
     // --- the list ---------------------------------------------------------------------------

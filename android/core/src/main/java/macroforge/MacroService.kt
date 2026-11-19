@@ -135,7 +135,7 @@ class MacroService : Service() {
                 for ((i, step) in steps.withIndex()) {
                     if (!Routine.runs(step, skipping, flow.always)) { skipped += step; results += "$step: skipped ($skipping)"; continue }
                     val sub = try { Scenarios.get(this, step) } catch (e: Exception) {
-                        results += "$step: unknown macro"; missing += step
+                        results += "$step: ${e.message ?: "unknown macro"}"; missing += step
                         if (skipping == null) skipping = Routine.skipAfter(step, null, flow.required)
                         continue
                     }
