@@ -156,7 +156,7 @@ object RunSummary {
      * The items a reward text names, with their numbers: "Rewards received: 1 / Gold Coin x5"
      * → {Gold Coin: 5}; "You have been rewarded 10 Gold Coins." → {Gold Coins: 10}.
      * Names are the words right before "x5" / "×5" (or after a leading number), dialog words left out.
-     * OCR often loses the space: "Chronos Stonex20" → {Chronos Stone: 20}.
+     * OCR often loses the space: "Gold Coinx20" → {Gold Coin: 20}.
      */
     fun parseItems(text: String): Map<String, Int> {
         val out = LinkedHashMap<String, Int>()
