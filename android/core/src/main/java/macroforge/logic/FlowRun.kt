@@ -222,6 +222,14 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
             "game_screen" -> InputService.instance?.let { s -> Game.of(ctx).let { g -> s.foreground == g.packageName && s.foregroundActivity == g.activity } } ?: false
             "view_moved" -> viewMoved(ctx)
             "now" -> System.currentTimeMillis() / 1000.0
+            // the phone is on Wi-Fi (or another unmetered network), e.g. before letting the game download a big update
+            "on_wifi" -> InputService.instance?.let { s -> runCatching {
+                val cm = s.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                cm.getNetworkCapabilities(cm.activeNetwork)?.let { c ->
+                    c.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+                        c.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+                } ?: false
+            }.getOrDefault(false) } ?: false
             // on-screen text (OCR) contains this, loosely (case and punctuation ignored)
             "text_has" -> Ocr.norm(Expr.str(args[0])).let { want -> texts(ctx).any { Ocr.norm(it.text).contains(want) } }
             // the text on screen (OCR), optionally only between heights y0..y1, for a log line (e.g. what a reward was)

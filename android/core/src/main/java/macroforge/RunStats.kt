@@ -60,7 +60,7 @@ object RunStats {
             r.startsWith("safety stop") -> Outcome.SAFETY
             // a macro that ends on a problem it saw itself says so: stop: "failed: <why>"
             r.startsWith("error:") || r.startsWith("failed:") || r.startsWith("no screen capture") || r.startsWith("taps are off") -> Outcome.ERROR
-            r.startsWith("stuck on") || r.startsWith("the screen stayed black") -> Outcome.STUCK
+            r.startsWith("stuck on") || r.startsWith("stuck in a loop") || r.startsWith("the screen stayed black") -> Outcome.STUCK
             else -> Outcome.DONE
         }
     }

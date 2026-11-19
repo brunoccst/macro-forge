@@ -39,7 +39,7 @@ import org.snakeyaml.engine.v2.api.LoadSettings
  *
  * The steps run in logic/FlowRun.kt, which ships in the downloadable logic pack (see Logic.kt).
  *
- * Expression functions: found('t'), captured('t'), text_has('s'), screen_text(y0, y1), game_in_front(), ad_in_front(), view_moved(), now(), pick(i, a, b, ...)
+ * Expression functions: found('t'), captured('t'), text_has('s'), screen_text(y0, y1), game_in_front(), ad_in_front(), on_wifi(), view_moved(), now(), pick(i, a, b, ...)
  */
 class FlowScenario(val spec: Map<String, Any?>, val source: String,
                    /** Saved by Claude through the phone connector, not from the macro library: listed under Custom. */
@@ -80,6 +80,8 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
     /** A routine's steps that still run after a required step failed (`always: [stop-game]`). */
     val always: Set<String> = list(spec["always"]).map { it.toString() }.toSet()
     override val unknownTimeoutS = (spec["unknown_timeout_s"] as? Number)?.toDouble() ?: 45.0
+    override val maxVisits: Map<String, Int> = map(spec["max_visits"]).entries.mapNotNull { (k, v) ->
+        (v as? Number)?.toInt()?.let { k.toString() to it } }.toMap()
     val screenDefs: Map<String, ScreenDef> = map(spec["define_screens"]).entries.associate { (k, v) ->
         val m = mapOrNull(v)
         k.toString() to ScreenDef(k.toString(), list(m?.get("require")).map { it.toString() }, list(m?.get("reject")).map { it.toString() })

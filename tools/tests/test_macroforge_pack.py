@@ -76,3 +76,14 @@ def test_routine_required_and_always_name_its_steps(tmp_path):
     problems = mp.check(tmp_path)
     assert any("always: 'c' is not one of its steps" in p for p in problems)
     assert not any("required:" in p for p in problems)
+
+
+def test_max_visits_names_its_screens(tmp_path):
+    _game(tmp_path)
+    (tmp_path / "macros" / "basic").mkdir(parents=True)
+    (tmp_path / "macros" / "basic" / "m.yaml").write_text(
+        "name: m\ngroup: basic\nhow: [x]\nscreens: [title, field]\nmax_visits: {title: 3, home: 2, field: 0}\n")
+    problems = mp.check(tmp_path)
+    assert any("max_visits: 'home' is not one of its screens" in p for p in problems)
+    assert any("max_visits: field: 0" in p for p in problems)
+    assert not any("max_visits: 'title'" in p or "max_visits: title" in p for p in problems)

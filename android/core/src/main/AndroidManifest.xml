@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- auto-update: check GitHub Releases, download and install the new APK -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- on_wifi() in macros: whether the phone is on Wi-Fi -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- turn the screen on and keep it on while Claude or a macro drives the game (ScreenWake) -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />

@@ -329,6 +329,12 @@ abstract class Scenario {
     abstract val screens: List<String>
     open val unknownTimeoutS: Double = 45.0
     open val tickS: Double = 0.4
+    /**
+     * Loop guard: a screen that may come back at most this many times in one run (`max_visits:
+     * {title: 3}`). One more and the run stops as stuck in a loop (screenshot, notification), instead
+     * of going round the same screens without getting anywhere.
+     */
+    open val maxVisits: Map<String, Int> = emptyMap()
 
     open fun setup(ctx: Context) {}
     open fun onUnknown(ctx: Context) {}
@@ -553,6 +559,12 @@ object Runner {
         shot.name
     }.onFailure { MacroLog.e("could not save the screenshot of where it stopped", it) }.getOrNull()
 
+    /** Whether [screen], now shown for the [visits]-th time, came back more often than the macro's `max_visits` allows. */
+    fun loopedOut(screen: String, visits: Int, maxVisits: Map<String, Int>) = maxVisits[screen]?.let { visits > it } ?: false
+
+    /** The stop reason of the loop guard (a "stuck" one: screenshot, notification, a routine's required step failed). */
+    fun loopReason(screen: String, visits: Int) = "stuck in a loop: the $screen screen came back $visits times"
+
     /** The longest side of a [StuckShots] screenshot: the connector's screenshot size, so its coordinates fit. */
     private const val STUCK_SHOT_MAX = 1024
 
@@ -596,6 +608,7 @@ object Runner {
         scenario.setup(ctx)
         var unknownSince: Long? = null
         var last: String? = "-"
+        val visits = HashMap<String, Int>()
         // [until] counts once the caller's screen was gone at least once (what was started took
         // over), or after a grace time (it never did): not while the caller's screen still lingers
         val started = System.currentTimeMillis()
@@ -615,6 +628,10 @@ object Runner {
                 MacroLog.i("screen: ${ctx.screen ?: "unknown"}")
                 last = ctx.screen
                 ctx.screen?.let { lastScreen = "${scenario.name}: $it" }
+                ctx.screen?.let { s ->
+                    val n = visits.merge(s, 1, Int::plus)!!
+                    if (loopedOut(s, n, scenario.maxVisits)) ctx.stop(loopReason(s, n))
+                }
             }
             val screen = ctx.screen
             if (screen == null) {
