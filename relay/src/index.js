@@ -56,14 +56,29 @@ export class PhoneRelay {
         try { old.close(4000, "replaced by a new connection"); } catch { /* already closed */ }
       }
       const pair = new WebSocketPair();
-      this.state.acceptWebSocket(pair[1]);
+      // tagged with the time it opened: requests go to the newest one (see phone())
+      this.state.acceptWebSocket(pair[1], [`opened:${Date.now()}`]);
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
     return this.mcp(await request.text());
   }
 
+  /**
+   * The phone's socket: the newest open one. A socket the app never closed (the app was killed,
+   * e.g. by an update) can stay listed as CLOSING long after close(), until Cloudflare notices
+   * the connection is gone; sending to it gets no answer, so it must never be picked.
+   */
+  phone() {
+    const open = this.state.getWebSockets().filter((ws) => ws.readyState === undefined || ws.readyState === 1);
+    const opened = (ws) => {
+      const tag = (this.state.getTags?.(ws) || []).find((t) => t.startsWith("opened:"));
+      return tag ? Number(tag.slice(7)) : 0;
+    };
+    return open.reduce((best, ws) => (best === null || opened(ws) >= opened(best) ? ws : best), null);
+  }
+
   async mcp(body) {
-    const phone = this.state.getWebSockets()[0];
+    const phone = this.phone();
     if (!phone) return this.offline(body);
     const id = crypto.randomUUID();
     const answer = new Promise((resolve) => {
@@ -71,7 +86,7 @@ export class PhoneRelay {
         this.pending.delete(id);
         resolve({ timeout: true });
       }, PHONE_TIMEOUT_MS);
-      this.pending.set(id, { resolve, timer });
+      this.pending.set(id, { resolve, timer, ws: phone });
     });
     try {
       phone.send(JSON.stringify({ id, body }));
@@ -114,11 +129,12 @@ export class PhoneRelay {
     if (m && typeof m.id === "string") this.settle(m.id, { body: m.body });
   }
 
-  webSocketClose() {
-    for (const id of [...this.pending.keys()]) this.settle(id, { offline: true });
+  /** A socket closed: the requests sent on it get the offline error (not those on a newer socket). */
+  webSocketClose(ws) {
+    for (const [id, p] of [...this.pending]) if (!ws || p.ws === ws) this.settle(id, { offline: true });
   }
 
-  webSocketError() {
-    this.webSocketClose();
+  webSocketError(ws) {
+    this.webSocketClose(ws);
   }
 }

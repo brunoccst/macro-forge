@@ -79,7 +79,9 @@ function relayWithPhone(answer) {
   const sockets = [];
   const kept = new Map();
   const storage = { get: async (k) => kept.get(k), put: async (k, v) => { kept.set(k, v); } };
-  const relay = new PhoneRelay({ getWebSockets: () => sockets, acceptWebSocket: () => {}, storage }, env);
+  const tags = new Map();
+  const relay = new PhoneRelay({ getWebSockets: () => sockets, acceptWebSocket: () => {}, getTags: (ws) => tags.get(ws) || [], storage }, env);
+  relay.tags = tags;
   if (answer) {
     sockets.push({
       send(msg) {
@@ -116,7 +118,8 @@ test("with no phone connected Claude gets a JSON-RPC error that says so", async 
 
 test("a phone that drops mid-request ends the request with the offline error", async () => {
   const { relay, sockets } = relayWithPhone(null);
-  sockets.push({ send() { queueMicrotask(() => relay.webSocketClose()); } });
+  const s = { send() { queueMicrotask(() => relay.webSocketClose(s)); } };
+  sockets.push(s);
   const j = await (await relay.mcp(rpc(9))).json();
   assert.equal(j.id, 9);
   assert.equal(j.error.message, OFFLINE);
@@ -145,4 +148,34 @@ test("the phone's tool list is kept and served while the phone is off", async ()
   const j = await (await relay.mcp(rpc(6, "tools/list"))).json();
   assert.equal(j.id, 6);
   assert.deepEqual(j.result.tools, tools);
+});
+
+test("requests go to the newest open socket, never to an old one stuck closing", async () => {
+  const { relay, sockets } = relayWithPhone(null);
+  const sent = [];
+  // the killed app's socket: still listed, CLOSING, never answers
+  const dead = { readyState: 2, send(m) { sent.push("dead"); } };
+  const old = { readyState: 1, send(m) { sent.push("old"); } };
+  const live = { readyState: 1, send(m) { sent.push("live"); const id = JSON.parse(m).id; queueMicrotask(() => relay.webSocketMessage(live, JSON.stringify({ id, body: "{}" }))); } };
+  sockets.push(dead, live, old);
+  relay.tags.set(dead, ["opened:3000"]);
+  relay.tags.set(old, ["opened:1000"]);
+  relay.tags.set(live, ["opened:2000"]);
+  const r = await relay.mcp(rpc(1, "ping"));
+  assert.equal(r.status, 200);
+  assert.deepEqual(sent, ["live"]);
+});
+
+test("an old socket closing doesn't end the requests waiting on the new one", async () => {
+  const { relay, sockets } = relayWithPhone(null);
+  const old = { readyState: 2, send() {} };
+  let id;
+  const live = { readyState: 1, send(m) { id = JSON.parse(m).id; } };
+  sockets.push(old, live);
+  const answer = relay.mcp(rpc(2, "ping"));
+  await Promise.resolve();
+  relay.webSocketClose(old);
+  assert.equal(relay.pending.size, 1);
+  relay.webSocketMessage(live, JSON.stringify({ id, body: "{\"ok\":1}" }));
+  assert.equal(await (await answer).text(), "{\"ok\":1}");
 });
