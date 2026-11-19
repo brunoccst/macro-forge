@@ -10,6 +10,10 @@
     <!-- turn the screen on and keep it on while Claude or a macro drives the game (ScreenWake) -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
+    <!-- the daily schedule: an exact alarm (Android 13+ grants USE_EXACT_ALARM at install; 12 asks), and set again after a reboot -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Android 11+ package visibility: needed to launch the game -->
     <queries>
@@ -58,7 +62,12 @@
         <!-- the daily schedule's alarm (DailySchedule) and the Allow/Deny buttons of Claude's questions (Alerts) -->
         <receiver
             android:name=".ScheduleReceiver"
-            android:exported="false" />
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <receiver
             android:name=".ApprovalReceiver"
             android:exported="false" />

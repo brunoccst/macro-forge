@@ -68,6 +68,20 @@ class AlwaysOnTest {
         assertEquals(d0 + day + 4 * h + 40 * m, DailySchedule.nextAt(d0 + 5 * h, 10, 4 * 60 + 30))
     }
 
+    @Test fun scheduleMissedAlarm() {
+        val h = 3_600_000L
+        val armed = 100 * h
+        // not yet due, or due but within the hour an inexact alarm may take
+        assertEquals(false, DailySchedule.missed(armed, 0, armed - h))
+        assertEquals(false, DailySchedule.missed(armed, 0, armed + h / 2))
+        // an hour late and it never went off: missed
+        assertEquals(true, DailySchedule.missed(armed, 0, armed + 2 * h))
+        assertEquals(true, DailySchedule.missed(armed, armed - 24 * h, armed + 2 * h)) // went off yesterday only
+        // it went off (late is fine), or nothing was set
+        assertEquals(false, DailySchedule.missed(armed, armed + 20 * 60_000L, armed + 2 * h))
+        assertEquals(false, DailySchedule.missed(0, 0, armed))
+    }
+
     @Test fun resetTimeParses() {
         assertEquals(15 * 60, GameProfile.parseClock("15:00"))
         assertEquals(4 * 60 + 30, GameProfile.parseClock(" 4:30 "))

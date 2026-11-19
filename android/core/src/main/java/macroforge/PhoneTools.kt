@@ -303,12 +303,13 @@ class PhoneTools(
         // what happened since Claude last looked (macro outcomes, scheduled runs, answers to its questions),
         // kept across app restarts; each is listed once
         PhoneEvents.init(app)
+        DailySchedule.reportMissed(app)
         val news = PhoneEvents.takeUnreported()
         val newsText = if (news.isEmpty()) "" else "\n\nnews since you last looked (tell the user what matters):\n" + PhoneEvents.describe(news)
         // a black frame is the usual reason for "the game isn't in front" loops: say it plainly
         val black = capture.grab(0)?.let { f -> f.allBlack.also { f.gray.release() } }
         val warn = if (black == true || ScreenWake.isOn() == false) "\nWARNING: " + ScreenWake.blackReason(ScreenWake.isOn(), capture.frameAgeMs()) + " (wake_screen turns it on)" else ""
-        return ToolResult("$head\n${screenState(black)}$warn$newsText\n\nlast log lines:\n$log")
+        return ToolResult("$head\n${screenState(black)}\n${DailySchedule.status(app)}$warn$newsText\n\nlast log lines:\n$log")
     }
 
     /**
