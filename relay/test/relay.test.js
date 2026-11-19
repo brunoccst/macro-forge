@@ -179,3 +179,10 @@ test("an old socket closing doesn't end the requests waiting on the new one", as
   relay.webSocketMessage(live, JSON.stringify({ id, body: "{\"ok\":1}" }));
   assert.equal(await (await answer).text(), "{\"ok\":1}");
 });
+
+test("a request the phone answers with nothing gets an error, not an empty 202", async () => {
+  const { relay } = relayWithPhone(() => null);
+  const j = await (await relay.mcp(rpc(11, "tools/call"))).json();
+  assert.equal(j.id, 11);
+  assert.match(j.error.message, /could not answer/);
+});
