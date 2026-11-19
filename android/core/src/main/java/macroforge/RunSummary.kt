@@ -156,10 +156,13 @@ object RunSummary {
      * The items a reward text names, with their numbers: "Rewards received: 1 / Gold Coin x5"
      * → {Gold Coin: 5}; "You have been rewarded 10 Gold Coins." → {Gold Coins: 10}.
      * Names are the words right before "x5" / "×5" (or after a leading number), dialog words left out.
+     * OCR often loses the space: "Chronos Stonex20" → {Chronos Stone: 20}.
      */
     fun parseItems(text: String): Map<String, Int> {
         val out = LinkedHashMap<String, Int>()
-        val words = text.replace("×", " x").replace(Regex("""(?i)(?<=\s|^)x\s+(\d)"""), "x$1").split(Regex("""\s+""")).filter { it.isNotEmpty() }
+        val words = text.replace("×", " x").replace(Regex("""(?i)(?<=\s|^)x\s+(\d)"""), "x$1")
+            .replace(Regex("""(?<=[a-z])x(\d[\d,]*)(?=[\s.,;]|$)"""), " x$1") // OCR's "Stonex20" = "Stone x20"
+            .split(Regex("""\s+""")).filter { it.isNotEmpty() }
         fun isWord(w: String) = Regex("""^[A-Za-z][A-Za-z'’.&-]*$""").matches(w) && w.lowercase().trim('.') !in NOT_NAME
         fun add(name: List<String>, n: Int) {
             val key = name.joinToString(" ").trim('.', ',', ':', ' ')
