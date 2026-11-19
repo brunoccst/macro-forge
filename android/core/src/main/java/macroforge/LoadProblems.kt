@@ -16,6 +16,9 @@ object LoadProblems {
 
     private val problems = ConcurrentHashMap<String, Problem>()
 
+    /** Where a new problem is logged (the app's log; tests, which have no Android, swap it). */
+    @Volatile var log: (String, Boolean) -> Unit = { line, error -> if (error) MacroLog.e(line) else MacroLog.i(line) }
+
     /** Notified (on any thread) when a new problem shows up. */
     val listeners = java.util.concurrent.CopyOnWriteArrayList<(Problem) -> Unit>()
 
@@ -26,8 +29,8 @@ object LoadProblems {
         if (old != null && old.message == msg) return false
         val p = Problem(file, kind, msg, System.currentTimeMillis())
         problems[file] = p
-        if (kind == "newer") MacroLog.i("$file needs a newer app: $msg")
-        else MacroLog.e("could not load $file (skipped, the rest keeps working): $msg")
+        if (kind == "newer") log("$file needs a newer app: $msg", false)
+        else log("could not load $file (skipped, the rest keeps working): $msg", true)
         listeners.forEach { runCatching { it(p) } }
         return true
     }

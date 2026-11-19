@@ -20,6 +20,7 @@ class LoadIsolationTest {
     @Before fun setUp() {
         root = Files.createTempDirectory("library").toFile()
         LoadProblems.reset()
+        LoadProblems.log = { _, _ -> } // no Android log in unit tests
     }
 
     @After fun tearDown() { root.deleteRecursively(); LoadProblems.reset() }
