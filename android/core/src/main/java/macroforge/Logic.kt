@@ -117,13 +117,20 @@ object Logic {
                 MacroLog.i("logic: using the logic pack ${pack?.source}")
             } catch (e: Throwable) {
                 if (e is VirtualMachineError && e !is StackOverflowError) throw e
-                val msg = "the installed logic pack can't be used (${e.javaClass.simpleName}: ${e.message}); using the built-in logic"
-                MacroLog.e("logic: $msg")
-                LoadProblems.report("logic pack", "logic", msg)
+                // a pack for the app build before an update is expected to stop fitting: not a problem
+                if (e is WrongShell) MacroLog.i("logic: the installed logic pack was for another app build; using the built-in logic")
+                else {
+                    val msg = "the installed logic pack can't be used (${e.javaClass.simpleName}: ${e.message}); using the built-in logic"
+                    MacroLog.e("logic: $msg")
+                    LoadProblems.report("logic pack", "logic", msg)
+                }
                 current.deleteRecursively()
             }
         }
     }
+
+    /** The pack was built for another app build (normal after an app update). */
+    private class WrongShell : IllegalStateException("it was built for another app build (install the newest app)")
 
     /** Info about a pack, from its logic.json. */
     private class Info(val shell: String, val code: Long, val name: String, val branch: String, val commit: String)
@@ -135,7 +142,7 @@ object Logic {
 
     private fun load(dir: File): Loaded {
         val i = info(dir)
-        if (i.shell != BuildConfig.SHELL_ID) throw IllegalStateException("it was built for another app build (install the newest app)")
+        if (i.shell != BuildConfig.SHELL_ID) throw WrongShell()
         val dex = File(dir, "classes.dex")
         // Android 14+ refuses to load writable code files
         dex.setReadOnly()
