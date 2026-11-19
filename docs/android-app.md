@@ -119,6 +119,16 @@ Users don't add macros themselves. Claude can save **custom** macros through the
 library and removed from the phone (`delete_macro`). `update_macros` installs the newest pack
 now.
 
+**A broken file fails on its own.** The app loads every macro, template library
+(`library.yaml`) and data file separately (`LoadProblems.kt`). A file that doesn't parse is
+skipped and reported; a bad entry in a template library only loses that template or screen. The
+other macros, the connector and the app's pages keep working. Broken files show on the Macros
+page, in `list_macros` and `macro_status`, in the log and as news when a pack brings them; starting
+the macro of a broken file fails with an error that names the file. The pack tool
+(`tools/macroforge_pack.py`) also refuses to build a pack with a file that doesn't parse, and
+`--check-yaml` checks every YAML file of a repo in CI, so a broken file shouldn't merge or ship
+in the first place.
+
 ## Templates captured with Claude
 
 The connector's `save_template` saves a box of the current screen as a template in the app's

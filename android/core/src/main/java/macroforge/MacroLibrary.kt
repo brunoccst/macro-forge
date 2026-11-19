@@ -101,8 +101,11 @@ object MacroLibrary {
         } finally {
             conn.disconnect()
         }
+        // the old pack's problems go with it; the new one's are found again (each bad file fails on its own)
+        LoadProblems.clearUnder("macros/"); LoadProblems.clearUnder("templates/"); LoadProblems.clear("game.yaml")
         val macros = Scenarios.parseAll(LibraryFiles(fresh))
         if (macros.isEmpty()) { fresh.deleteRecursively(); throw IllegalStateException("the macro pack holds no macros") }
+        val broken = checkFiles(LibraryFiles(fresh))
         File(fresh, "version.json").writeText(JSONObject()
             .put("commit", pack.commit).put("branch", pack.branch)
             .put("built", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date()))
@@ -111,8 +114,55 @@ object MacroLibrary {
         if (root.exists() && !root.renameTo(old)) throw IllegalStateException("could not replace the old library")
         if (!fresh.renameTo(root)) { old.renameTo(root); throw IllegalStateException("could not install the new library") }
         old.deleteRecursively()
+        checked = pack.commit
         MacroLog.i("macros updated to ${pack.branch}@${pack.commit.take(7)} (${macros.size} macros)")
+        if (broken.isNotEmpty()) runCatching {
+            PhoneEvents.init(c)
+            PhoneEvents.add("problem", "Macro pack ${pack.commit.take(7)}: ${broken.size} file(s) can't be loaded",
+                "Skipped; everything else works:\n" + LoadProblems.describe(broken), ok = false)
+        }
         listeners.forEach { runCatching { it() } }
+    }
+
+    @Volatile private var checked: String? = null
+
+    /** Check the installed library's files once per installed pack (see [checkFiles]). */
+    fun checkOnce(c: Context) {
+        val commit = installed(c)?.commit ?: return
+        if (checked == commit) return
+        checked = commit
+        runCatching { checkFiles(files(c)) }.onFailure { MacroLog.e("could not check the macro files", it) }
+    }
+
+    /**
+     * Parse every YAML file of a library (macros, template libraries, data files, game.yaml) on its
+     * own and report each one that doesn't parse ([LoadProblems]); the broken ones. Nothing here
+     * throws: a bad file only fails itself (the macro or template folder that uses it).
+     */
+    fun checkFiles(files: LibraryFiles): List<LoadProblems.Problem> {
+        val out = ArrayList<LoadProblems.Problem>()
+        fun walk(dir: String) {
+            for (n in files.list(dir)) {
+                val path = if (dir.isEmpty()) n else "$dir/$n"
+                if (files.isDir(path)) { walk(path); continue }
+                if (!n.endsWith(".yaml") && !n.endsWith(".yml")) continue
+                val kind = when {
+                    path.startsWith("macros/") -> "macro"
+                    n == "library.yaml" -> "templates"
+                    else -> "data"
+                }
+                try {
+                    files.open(path).bufferedReader().use { org.snakeyaml.engine.v2.api.Load(org.snakeyaml.engine.v2.api.LoadSettings.builder().build()).loadFromString(it.readText()) }
+                    if (kind == "data") LoadProblems.clear(path)
+                } catch (e: Throwable) {
+                    if (e is VirtualMachineError && e !is StackOverflowError) throw e
+                    LoadProblems.report(path, kind, "${e.javaClass.simpleName}: ${e.message}")
+                    LoadProblems.all().firstOrNull { it.file == path }?.let { out += it }
+                }
+            }
+        }
+        walk("")
+        return out
     }
 
     private val busy = AtomicBoolean(false)

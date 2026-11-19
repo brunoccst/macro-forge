@@ -87,3 +87,52 @@ def test_max_visits_names_its_screens(tmp_path):
     assert any("max_visits: 'home' is not one of its screens" in p for p in problems)
     assert any("max_visits: field: 0" in p for p in problems)
     assert not any("max_visits: 'title'" in p or "max_visits: title" in p for p in problems)
+
+
+# a quoting mistake like the one that once broke every connector call on the phone
+BROKEN = "a: '\"Confirming Updates\" under the title screen's progress bar'\n"
+
+
+def test_a_broken_yaml_file_anywhere_in_the_pack_is_a_problem(tmp_path):
+    _game(tmp_path)
+    (tmp_path / "macros" / "basic").mkdir(parents=True)
+    (tmp_path / "macros" / "basic" / "a.yaml").write_text("name: a\ngroup: basic\nhow: [x]\nunknown: [{wait: 1}]\n")
+    lib = tmp_path / "templates" / "common"
+    lib.mkdir(parents=True)
+    (lib / "library.yaml").write_text("templates:\n  x:\n    notes: " + BROKEN.split(": ", 1)[1])
+    problems = mp.check(tmp_path)
+    assert len(problems) == 1 and problems[0].startswith("templates/common/library.yaml: not valid YAML")
+    try:
+        mp.build(tmp_path / "macros.zip", tmp_path)
+        raise AssertionError("a pack with a broken file must not be built")
+    except SystemExit as e:
+        assert "library.yaml" in str(e)
+
+
+def test_a_broken_macro_or_game_profile_is_reported_not_crashed(tmp_path):
+    _game(tmp_path)
+    (tmp_path / "macros" / "basic").mkdir(parents=True)
+    (tmp_path / "macros" / "basic" / "bad.yaml").write_text("name: bad\n" + BROKEN)
+    assert any(p.startswith("macros/basic/bad.yaml: not valid YAML") for p in mp.check(tmp_path))
+    (tmp_path / "game.yaml").write_text(BROKEN)
+    assert mp.check(tmp_path)[0].startswith("game.yaml: not valid YAML")
+
+
+def test_template_library_entries_are_checked(tmp_path):
+    _game(tmp_path)
+    lib = tmp_path / "templates" / "common"
+    lib.mkdir(parents=True)
+    (lib / "library.yaml").write_text("templates:\n  ok: {region: [0, 0, 1, 1], ref: [2400, 1080]}\n  bad: {region: [0, 0]}\n")
+    problems = mp.check(tmp_path)
+    assert "templates/common/library.yaml: template bad: region must be [x, y, w, h]" in problems
+    assert not any("template ok" in p for p in problems)
+
+
+def test_check_yaml_walks_the_whole_repo(tmp_path):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "x.yml").write_text(BROKEN)
+    (tmp_path / "ok.yaml").write_text("a: 1\n")
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "node_modules" / "skip.yaml").write_text(BROKEN)
+    assert [p.split(":")[0] for p in mp.check_yaml(tmp_path)] == ["docs/x.yml"]
+    assert mp.check_yaml(ROOT) == []

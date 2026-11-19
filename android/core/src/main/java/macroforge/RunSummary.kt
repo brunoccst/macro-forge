@@ -81,7 +81,8 @@ object RunSummary {
         } + " (${steps.size} step(s), ${RunStats.duration(ms)})"
         val lines = ArrayList<String>()
         for (s in steps) lines += "${mark(s.outcome)} ${pretty(s.macro)}: ${s.reason}"
-        for (m in missing) lines += "✕ $m: unknown macro (update the macros)"
+        for (m in missing) lines += "✕ $m: " + (LoadProblems.forMacro(m)?.let { if (it.kind == "newer") "needs a newer app (${it.message})" else "its file ${it.file} is broken (${it.message})" }
+            ?: "unknown macro (update the macros)")
         if (end.startsWith("safety stop")) lines += "The remaining steps were skipped after the safety stop."
         if (skipping != null && skipped.isNotEmpty()) lines += "Skipped (${skipping}): " + skipped.joinToString { pretty(it) }
         for (s in bad.filter { it.outcome != RunStats.Outcome.STOPPED }) {

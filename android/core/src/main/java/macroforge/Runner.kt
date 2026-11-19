@@ -279,7 +279,7 @@ class Context(
      * chose them, plus [given]; its stop reason.
      */
     fun runBasic(name: String, given: Map<String, String> = emptyMap(), until: List<String> = emptyList()): String {
-        val sub = findMacro(name) ?: throw IllegalStateException("the basic macro '$name' is missing: update the macros")
+        val sub = findMacro(name) ?: throw IllegalStateException(LoadProblems.forMacro(name)?.let { Scenarios.missing(name) } ?: "the basic macro '$name' is missing: update the macros")
         return Runner.runInside(sub, given, this, until)
     }
 
@@ -362,7 +362,7 @@ object Scenarios {
             load({ f.readText() }, f.name, custom = true)?.let { if (it.name !in found) found[it.name] = it }
         }
         // each macro takes over the options of the macros it runs (custom ones too)
-        InnerParams.link(found.values)
+        link(found.values)
         return found.values.toList()
     }
 
@@ -377,25 +377,43 @@ object Scenarios {
             }
         }
         walk("macros")
-        InnerParams.link(out)
+        link(out)
         return out
     }
 
+    /** The macro named [name]; a clear error when there is none, or when its file can't be loaded. */
     fun get(context: android.content.Context, name: String) =
-        all(context).firstOrNull { it.name == name } ?: throw IllegalArgumentException("unknown macro '$name'")
+        all(context).firstOrNull { it.name == name } ?: throw IllegalArgumentException(missing(name))
 
-    // macros are loaded again for every run: say once per file what can't be loaded, not every time
-    private val warned = java.util.Collections.synchronizedSet(HashSet<String>())
+    /** "unknown macro 'x'", plus why when a file of that name failed to load (see [LoadProblems]). */
+    fun missing(name: String): String = LoadProblems.forMacro(name)?.let {
+        if (it.kind == "newer") "macro '$name' needs a newer app: ${it.message}"
+        else "macro '$name' can't be loaded: its file ${it.file} is broken (${it.message}); the other macros still work"
+    } ?: "unknown macro '$name'"
 
-    private fun load(read: () -> String, source: String, custom: Boolean = false): Scenario? = try {
-        val s = FlowScenario.parse(read(), source, custom)
-        if (s.unsupported.isNotEmpty()) {
-            if (warned.add("$source:${s.unsupported}")) MacroLog.i("macro ${s.name} needs a newer app (unknown steps: ${s.unsupported.joinToString()})")
+    /** Each macro takes over its inner macros' options; a problem there must not hide the macros. */
+    private fun link(all: Collection<Scenario>) {
+        runCatching { InnerParams.link(all) }.onFailure { MacroLog.e("could not link the macros' inner options", it) }
+    }
+
+    /**
+     * One macro file: a file that can't be parsed (or that a step of it breaks) is skipped and
+     * reported ([LoadProblems]), never taking the other macros down with it. Catches every
+     * Throwable: a broken file may also trip an Error in the parser (e.g. a stack overflow).
+     */
+    private fun load(read: () -> String, source: String, custom: Boolean = false): Scenario? {
+        val file = if (custom) "custom/$source" else source
+        return try {
+            val s = FlowScenario.parse(read(), source, custom)
+            if (s.unsupported.isNotEmpty()) {
+                LoadProblems.report(file, "newer", "unknown steps: ${s.unsupported.joinToString()}")
+                null
+            } else { LoadProblems.clear(file); s }
+        } catch (e: Throwable) {
+            if (e is VirtualMachineError && e !is StackOverflowError) throw e
+            LoadProblems.report(file, "macro", "${e.javaClass.simpleName}: ${e.message}")
             null
-        } else s
-    } catch (e: Exception) {
-        if (warned.add("$source:${e.message}")) MacroLog.e("could not load macro $source: ${e.message}")
-        null
+        }
     }
 }
 

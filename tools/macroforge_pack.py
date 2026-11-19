@@ -12,7 +12,8 @@ Layout of the zip (the same paths the app reads):
     templates/<folder>/...            <pack.folders>/<folder>/templates (default folders/) and the
                                       data files (.yaml) next to that templates folder
 
-``check`` finds what would break a macro on the phone: bad YAML, a duplicate name, a missing
+``check`` finds what would break a macro on the phone: a YAML file that doesn't parse (any file of
+the pack: macros, template libraries, data files, game.yaml), a malformed template library entry, a duplicate name, a missing
 template folder, a ``run:``, routine step or ``uses:`` naming a macro that isn't there, a macro
 filed under the wrong group folder or a group game.yaml doesn't list, a game.yaml missing a key,
 an option name with a dot (reserved for the options a macro takes over from the macros it runs),
@@ -20,6 +21,7 @@ a macro with no steps for the app's "How it works" (``how:``, or a step of game.
 ``plugin_steps:``, which the game plugin describes itself).
 
     python tools/macroforge_pack.py --root <game repo> -o macros.zip [--commit SHA --branch NAME]
+    python tools/macroforge_pack.py --root <repo> --check-yaml     (every YAML file of the repo parses)
 """
 from __future__ import annotations
 
@@ -191,10 +193,91 @@ def _check_game(profile: dict) -> list[str]:
     return problems
 
 
+# folders a repo-wide YAML check leaves out (not the app's files)
+SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "build", ".gradle"}
+
+
+def _yaml_error(f: Path) -> str | None:
+    """Why [f] doesn't parse as YAML (None: it does)."""
+    try:
+        yaml.safe_load(f.read_text(encoding="utf-8"))
+        return None
+    except (yaml.YAMLError, UnicodeDecodeError) as e:
+        return " ".join(str(e).split())
+
+
+def check_yaml(root: Path, files: list[Path] | None = None) -> list[str]:
+    """
+    Every YAML file under [root] (or just [files]) parses. The phone loads each file of the pack on
+    its own and skips a broken one, but a broken file still loses its macro or templates there:
+    CI must never let one merge or ship.
+    """
+    if files is None:
+        files = sorted(
+            f for f in root.rglob("*") if f.suffix in (".yaml", ".yml") and f.is_file()
+            and not SKIP_DIRS & set(f.relative_to(root).parts[:-1])
+        )
+    problems = []
+    for f in files:
+        err = _yaml_error(f)
+        if err:
+            problems.append(f"{f.relative_to(root).as_posix()}: not valid YAML: {err}")
+    return problems
+
+
+def _region_ok(v) -> bool:
+    return isinstance(v, list) and len(v) == 4 and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in v)
+
+
+def _check_template_library(rel: str, data) -> list[str]:
+    """A template folder's library.yaml as the app reads it (Vision.kt Library)."""
+    if data is None:
+        return []
+    if not isinstance(data, dict):
+        return [f"{rel}: not a template library (a map with templates: and screens:)"]
+    problems = []
+    tpls = data.get("templates") or {}
+    if not isinstance(tpls, dict):
+        return [f"{rel}: templates: must be a map"]
+    for name, spec in tpls.items():
+        if spec is None:
+            continue
+        if not isinstance(spec, dict):
+            problems.append(f"{rel}: template {name}: must be a map")
+            continue
+        if "region" in spec and not _region_ok(spec["region"]):
+            problems.append(f"{rel}: template {name}: region must be [x, y, w, h]")
+        ref = spec.get("ref")
+        if ref is not None and not (isinstance(ref, list) and len(ref) == 2 and all(isinstance(x, int) for x in ref)):
+            problems.append(f"{rel}: template {name}: ref must be [width, height]")
+        for k in ("bright", "dim"):
+            if k in spec and not (isinstance(spec[k], list) and all(_region_ok(r) for r in spec[k])):
+                problems.append(f"{rel}: template {name}: {k} must be a list of [x, y, w, h]")
+        if "threshold" in spec and not isinstance(spec["threshold"], (int, float)):
+            problems.append(f"{rel}: template {name}: threshold must be a number")
+    screens = data.get("screens") or {}
+    if not isinstance(screens, dict):
+        return problems + [f"{rel}: screens: must be a map"]
+    for name, spec in screens.items():
+        if spec is not None and not isinstance(spec, dict):
+            problems.append(f"{rel}: screen {name}: must be a map with require:/reject:")
+    return problems
+
+
 def check(root: Path) -> list[str]:
     """Problems that would break a macro on the phone (empty = fine)."""
+    if (root / GAME).is_file() and _yaml_error(root / GAME):
+        return check_yaml(root, [root / GAME])  # the pack's layout comes from game.yaml
+    files = pack_files(root)
+    broken = check_yaml(root, [f for f in files.values() if f.suffix in (".yaml", ".yml")])
+    if broken:
+        return broken  # the other checks need the files parsed
+    lib_problems = []
+    for arc, f in files.items():
+        if arc.startswith("templates/") and f.name == "library.yaml":
+            lib_problems += _check_template_library(arc, yaml.safe_load(f.read_text(encoding="utf-8")))
     profile = game(root)
-    problems: list[str] = _check_game(profile)
+    problems: list[str] = _check_game(profile) + lib_problems
     groups = {g.get("id") for g in profile.get("groups") or [] if isinstance(g, dict)}
     explained = {str(s) for s in profile.get("plugin_steps") or []}
     globals_ = profile.get("globals") if isinstance(profile.get("globals"), dict) else {}
@@ -282,8 +365,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--commit", default="")
     ap.add_argument("--branch", default="")
     ap.add_argument("--check", action="store_true", help="only check the macros, write nothing")
+    ap.add_argument("--check-yaml", action="store_true", help="only check that every YAML file under --root parses")
     a = ap.parse_args(argv)
     root = a.root.resolve()
+    if a.check_yaml:
+        problems = check_yaml(root)
+        print("\n".join(problems) or "ok: every YAML file parses")
+        raise SystemExit(1 if problems else 0)
     if a.check:
         problems = check(root)
         print("\n".join(problems) or "ok")

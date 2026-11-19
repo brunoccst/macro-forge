@@ -129,7 +129,9 @@ class Library private constructor() {
     fun addDir(dir: java.io.File) {
         val yaml = java.io.File(dir, "library.yaml")
         if (!yaml.isFile) return
-        parse(yaml.readText()) { file -> java.io.File(dir, file).takeIf { it.isFile }?.readBytes() }
+        guarded("templates/${dir.name}/library.yaml") {
+            parse(yaml.readText(), it) { file -> java.io.File(dir, file).takeIf { f -> f.isFile }?.readBytes() }
+        }
     }
 
     fun addScreens(defs: Map<String, ScreenDef>) { screens.putAll(defs) }
@@ -146,14 +148,34 @@ class Library private constructor() {
         } catch (e: java.io.IOException) {
             return
         }
-        parse(yamlText) { file -> try { assets.open("$folder/$file").use { it.readBytes() } } catch (e: java.io.IOException) { null } }
+        guarded("$folder/library.yaml") {
+            parse(yamlText, it) { file -> try { assets.open("$folder/$file").use { s -> s.readBytes() } } catch (e: java.io.IOException) { null } }
+        }
+    }
+
+    /**
+     * Load one library.yaml ([source]) so that a broken file fails on its own: a file that can't be
+     * parsed adds nothing, a broken entry only loses that template or screen; every problem is
+     * reported ([LoadProblems]) and the rest of the templates keep working.
+     */
+    private fun guarded(source: String, block: (MutableList<String>) -> Unit) {
+        val bad = ArrayList<String>()
+        try {
+            block(bad)
+            if (bad.isEmpty()) LoadProblems.clear(source)
+            else LoadProblems.report(source, "templates", "skipped broken entries: " + bad.joinToString("; "))
+        } catch (e: Throwable) {
+            if (e is VirtualMachineError && e !is StackOverflowError) throw e
+            LoadProblems.report(source, "templates", "${e.javaClass.simpleName}: ${e.message}")
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun parse(yamlText: String, read: (String) -> ByteArray?) {
-        val data = Load(LoadSettings.builder().build()).loadFromString(yamlText) as? Map<String, Any?> ?: return
+    private fun parse(yamlText: String, bad: MutableList<String>, read: (String) -> ByteArray?) {
+        val loaded = Load(LoadSettings.builder().build()).loadFromString(yamlText) ?: return
+        val data = loaded as? Map<String, Any?> ?: throw IllegalArgumentException("not a template library (no templates:/screens: map)")
         val tpls = data["templates"] as? Map<String, Any?> ?: emptyMap()
-        for ((name, specAny) in tpls) {
+        for ((name, specAny) in tpls) try {
             val spec = specAny as? Map<String, Any?> ?: emptyMap()
             val file = spec["file"] as? String ?: "$name.png"
             val ref = (spec["ref"] as? List<*>)?.map { (it as Number).toInt() }?.toIntArray()
@@ -168,16 +190,16 @@ class Library private constructor() {
                 bright = (spec["bright"] as? List<*>)?.map { Region.parse(it) } ?: emptyList(),
                 dim = (spec["dim"] as? List<*>)?.map { Region.parse(it) } ?: emptyList(),
             )
-        }
+        } catch (e: Exception) { bad += "template $name: ${e.javaClass.simpleName}: ${e.message}" }
         val scr = data["screens"] as? Map<String, Any?> ?: emptyMap()
-        for ((name, specAny) in scr) {
+        for ((name, specAny) in scr) try {
             val spec = specAny as? Map<String, Any?> ?: emptyMap()
             screens[name] = ScreenDef(
                 name,
-                (spec["require"] as? List<*>)?.map { it as String } ?: emptyList(),
-                (spec["reject"] as? List<*>)?.map { it as String } ?: emptyList(),
+                (spec["require"] as? List<*>)?.map { it.toString() } ?: emptyList(),
+                (spec["reject"] as? List<*>)?.map { it.toString() } ?: emptyList(),
             )
-        }
+        } catch (e: Exception) { bad += "screen $name: ${e.javaClass.simpleName}: ${e.message}" }
     }
 
     private fun decodeGray(bytes: ByteArray): Mat? {

@@ -48,3 +48,9 @@ a comment, means a new install.
   any game; a game app should test that they never use its own classes.
 - **Stored state:** the loaded pack lives in the app's files (`files/logic/current`). If it fails
   to load, the app logs why and runs the built-in logic.
+- **A pack that breaks later is turned off.** The shell reaches the pack through a guard: a
+  `LinkageError` from it (a missing class or method, a failed static init) turns the pack off,
+  answers with the built-in logic and reports it (log, news, `macro_status`). A macro run that hits
+  it stops with a clear reason; the next run uses the built-in logic. The broken pack's commit is
+  remembered and not loaded again; a newer pack is. Ordinary exceptions of a macro's steps only
+  fail that run.

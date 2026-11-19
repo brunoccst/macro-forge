@@ -28,6 +28,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pyyaml pytest
+      - name: Every YAML file parses (one broken file must never merge)
+        run: python tools/macroforge_pack.py --root . --check-yaml
       - name: Macro pack tool tests (on the starter game)
         run: python -m pytest -q tools/tests
       - name: Build the starter's macro pack

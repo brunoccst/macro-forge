@@ -107,7 +107,7 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
             "run" in a -> {
                 val target = runTarget(a["run"])
                 val m = mapOrNull(a["run"])
-                val sub = ctx.findMacro(target) ?: throw IllegalArgumentException("$name: run: unknown macro '$target'")
+                val sub = ctx.findMacro(target) ?: throw IllegalArgumentException("$name: run: ${Scenarios.missing(target)}")
                 val given = map(m?.get("params")).entries.associate { (k, v) -> k to Expr.str(value(ctx, v)) }
                 val until = list(m?.get("until")).map { it.toString() }
                 vars["result"] = Runner.runInside(sub, given, ctx, until)
