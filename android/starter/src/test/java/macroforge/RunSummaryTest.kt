@@ -13,6 +13,7 @@ class RunSummaryTest {
         assertEquals(mapOf("Gold Coins" to 10), RunSummary.parseItems("Thank you for watching. You have been rewarded 10 Gold Coins."))
         assertEquals(mapOf("Gold Coin" to 50, "Coins" to 10000), RunSummary.parseItems("The items below have been received. Gold Coin ×50 Coins x10,000"))
         assertEquals(mapOf("Feather" to 3), RunSummary.parseItems("Feather x 3"))
+        assertEquals(mapOf("Chronos Stone" to 20), RunSummary.parseItems("The items below have been received Chronos Stonex20 11/19/2026 20:30(UTC)"))
         assertTrue(RunSummary.parseItems("Could not receive the item: you reached the limit").isEmpty())
     }
 
