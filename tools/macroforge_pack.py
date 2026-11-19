@@ -219,6 +219,16 @@ def check(root: Path) -> list[str]:
             for s in spec.get(key) or []:
                 if str(s) not in {str(x) for x in spec.get("steps") or []}:
                     problems.append(f"{rel}: {key}: {s!r} is not one of its steps")
+        # max_visits: (loop guard) names its own screens with a whole number of visits
+        mv = spec.get("max_visits") or {}
+        if not isinstance(mv, dict):
+            problems.append(f"{rel}: max_visits must be a map of screen: number")
+        else:
+            for s, n in mv.items():
+                if str(s) not in {str(x) for x in spec.get("screens") or []}:
+                    problems.append(f"{rel}: max_visits: {s!r} is not one of its screens")
+                if not isinstance(n, int) or isinstance(n, bool) or n < 1:
+                    problems.append(f"{rel}: max_visits: {s}: {n!r} is not a whole number of at least 1")
         used += [str(s) for s in spec.get("uses") or []]
         # a set: value is an expression: an empty one crashes the macro on the phone ('' is the empty text)
         for acts in [spec.get("setup"), spec.get("unknown"), *(spec.get("handlers") or {}).values()]:

@@ -65,7 +65,7 @@ Actions (one key each):
   got: "reward text {expr}"   (the items it names, e.g. "${game.claude.rewardExample}", go in the outcome message)
   if: expr  then: [actions]  else: [actions]          repeat: {times: expr, do: [actions]}
   reset_view: true            (forget the last view for view_moved())
-Expression functions: found('t'), captured('t'), text_has('s'), screen_text(y0, y1), game_in_front(), ad_in_front(), view_moved(), now(), pick(i, a, b, ...)
+Expression functions: found('t'), captured('t'), text_has('s'), screen_text(y0, y1), game_in_front(), ad_in_front(), on_wifi(), view_moved(), now(), pick(i, a, b, ...)
 ${game.claude.format.joinToString("\n")}
 """.trimIndent()
 }

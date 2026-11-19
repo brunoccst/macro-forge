@@ -16,8 +16,18 @@ class RunStatsTest {
         assertEquals(RunStats.Outcome.ERROR, RunStats.classify("failed: a commercial did not close"))
         assertEquals(RunStats.Outcome.SAFETY, RunStats.classify("safety stop: the shop or a purchase popup was on screen (no tap made there)"))
         assertEquals(RunStats.Outcome.STUCK, RunStats.classify("stuck on an unrecognised screen for 45s"))
+        assertEquals(RunStats.Outcome.STUCK, RunStats.classify(Runner.loopReason("title", 4)))
+        assertTrue(Routine.failed(Runner.loopReason("title", 4)))
         assertEquals(RunStats.Outcome.DONE, RunStats.classify("Forest Quest done — 13m 25s; chests 7/7"))
         assertEquals(RunStats.Outcome.DONE, RunStats.classify("finished"))
+    }
+
+    @Test fun loopGuard() {
+        val max = mapOf("title" to 3)
+        assertEquals(false, Runner.loopedOut("title", 3, max))
+        assertEquals(true, Runner.loopedOut("title", 4, max))
+        assertEquals(false, Runner.loopedOut("field", 99, max)) // no limit for it
+        assertEquals(false, Runner.loopedOut("title", 99, emptyMap()))
     }
 
     @Test fun groupsReasonsWithoutNumbers() {

@@ -57,6 +57,7 @@ screens: [shop, home]                 # priority order: specific screens first
 define_screens:
   my_screen: {require: [my_template], reject: [other_template]}
 unknown_timeout_s: 45
+max_visits: {home: 5}               # loop guard: home may come back 5 times; the 6th stops the run as stuck
 setup: []                             # actions, once at the start
 handlers:
   home:
@@ -88,7 +89,7 @@ Actions (one key each):
 
 Expressions can use the params, variables and `found('t')`, `captured('t')`, `text_has('s')`,
 `screen_text(y0, y1)`, `game_in_front()`, `ad_in_front()`, `game_screen()` (the game's own
-activity in front: no commercial), `view_moved()`, `now()`, `pick(i, a, b, ...)`, and three
+activity in front: no commercial), `on_wifi()` (the phone is on Wi-Fi or another unmetered network), `view_moved()`, `now()`, `pick(i, a, b, ...)`, and three
 signs that a commercial has played to its end, so a macro can close it then instead of after a
 fixed time (logic/AdSigns.kt):
 
