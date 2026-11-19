@@ -161,7 +161,8 @@ object RunSummary {
     fun parseItems(text: String): Map<String, Int> {
         val out = LinkedHashMap<String, Int>()
         val words = text.replace("×", " x").replace(Regex("""(?i)(?<=\s|^)x\s+(\d)"""), "x$1")
-            .replace(Regex("""(?<=[a-z])x(\d[\d,]*)(?=[\s.,;]|$)"""), " x$1") // OCR's "Stonex20" = "Stone x20".split(Regex("""\s+""")).filter { it.isNotEmpty() }
+            .replace(Regex("""(?<=[a-z])x(\d[\d,]*)(?=[\s.,;]|$)"""), " x$1") // OCR's "Stonex20" = "Stone x20"
+            .split(Regex("""\s+""")).filter { it.isNotEmpty() }
         fun isWord(w: String) = Regex("""^[A-Za-z][A-Za-z'’.&-]*$""").matches(w) && w.lowercase().trim('.') !in NOT_NAME
         fun add(name: List<String>, n: Int) {
             val key = name.joinToString(" ").trim('.', ',', ':', ' ')
