@@ -54,6 +54,26 @@ def test_runs_unknown_macro(tmp_path):
     assert any("runs unknown macro 'nope'" in p for p in mp.check(tmp_path))
 
 
+
+def test_runs_the_macro_picked_in_an_option(tmp_path):
+    _game(tmp_path)
+    d = tmp_path / "macros" / "basic"
+    d.mkdir(parents=True)
+    (d / "a.yaml").write_text("name: a\ngroup: basic\nhow: [x]\nunknown: [{wait: 1}]\n")
+    (d / "b.yaml").write_text(
+        "name: b\ngroup: basic\nhow: [x]\nparams:\n  pick: {default: 'off', choices: ['off', a]}\n"
+        "setup: [{if: \"pick != 'off'\", then: [{run: {macro: '{pick}'}}]}]\n")
+    assert mp.check(tmp_path) == []
+    (d / "b.yaml").write_text(
+        "name: b\ngroup: basic\nhow: [x]\nparams:\n  pick: {default: a, choices: [a, nope, b]}\n  free: {default: a}\n"
+        "setup: [{run: {macro: '{pick}'}}, {run: '{free}'}, {run: '{missing}'}]\n")
+    problems = mp.check(tmp_path)
+    assert any("choice 'nope' is not a macro" in p for p in problems)
+    assert any("choice 'b' runs itself" in p for p in problems)
+    assert any("picked in 'free'" in p for p in problems)
+    assert any("picked in 'missing'" in p for p in problems)
+
+
 def test_options_follow_known_globals(tmp_path):
     _game(tmp_path, globals={"team": {"default": "current", "choices": ["current", 1, 2]},
                              "bad": {"default": 9, "choices": [1, 2]}})

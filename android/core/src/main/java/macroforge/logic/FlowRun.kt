@@ -105,7 +105,8 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
             }
             "reset_view" in a -> { lastView?.release(); lastView = null }
             "run" in a -> {
-                val target = runTarget(a["run"])
+                // the macro's name may come from an option: run: {macro: "{dungeon}"} runs the one picked there
+                val target = text(ctx, runTarget(a["run"])).trim()
                 val m = mapOrNull(a["run"])
                 val sub = ctx.findMacro(target) ?: throw IllegalArgumentException("$name: run: ${Scenarios.missing(target)}")
                 val given = map(m?.get("params")).entries.associate { (k, v) -> k to Expr.str(value(ctx, v)) }

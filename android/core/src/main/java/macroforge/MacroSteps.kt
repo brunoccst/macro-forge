@@ -107,7 +107,8 @@ object MacroSteps {
                 how(if (yes) m["then"] else m["else"], env, explain).mapIndexed { i, s -> if (i == 0 && s.note.isEmpty() && note.isNotEmpty()) s.copy(note = note) else s }
             }
             "run" in m -> {
-                val name = FlowScenario.runTarget(m["run"])
+                // a name picked in an option ("{dungeon}"): the macro picked there now
+                val name = fill(FlowScenario.runTarget(m["run"]), env.options)
                 // the values a run: gives are expressions ('ads', battles + 1): their value with the options as set
                 val given = FlowScenario.map(m["params"]).mapValues { (_, v) ->
                     val raw = Expr.str(v)

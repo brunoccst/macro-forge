@@ -127,6 +127,8 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
                     "repeat" in m -> walk(map(m["repeat"])["do"])
                     "run" in m -> {
                         val target = runTarget(m["run"])
+                        // a name picked in an option ("{dungeon}") is only known when it runs
+                        if ('{' in target) continue
                         found += target
                         val keys = map(mapOrNull(m["run"])?.get("params")).keys
                         given[target] = given[target]?.intersect(keys) ?: keys

@@ -99,6 +99,34 @@ def _runs(actions) -> list[str]:
     return names
 
 
+def _picked_option(target: str) -> str | None:
+    """The option a `run: {macro: "{option}"}` takes the macro's name from (None: a plain name)."""
+    m = re.fullmatch(r"\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}", target.strip())
+    return m.group(1) if m else None
+
+
+# a choice of a macro-picking option that runs nothing (the macro checks for it before its run:)
+NO_MACRO = "off"
+
+
+def _check_picked(rel, name: str, option: str, params: dict, all_macros: dict) -> list[str]:
+    """A `run:` whose macro is picked in an option: that option lists macros to pick from (or off)."""
+    p = params.get(option)
+    choices = p.get("choices") if isinstance(p, dict) else None
+    if not choices:
+        return [f"{rel}: runs the macro picked in {option!r}, which is not an option with choices:"]
+    out = []
+    for c in choices:
+        c = str(c)
+        if c == NO_MACRO:
+            continue
+        if c not in all_macros:
+            out.append(f"{rel}: option {option!r}: choice {c!r} is not a macro (runs unknown macro)")
+        elif c == name:
+            out.append(f"{rel}: option {option!r}: choice {c!r} runs itself")
+    return out
+
+
 def _sets(actions) -> list[tuple[str, object]]:
     """(variable, expression) of every `set:` in a list of actions (also inside if / repeat)."""
     out: list[tuple[str, object]] = []
@@ -152,7 +180,7 @@ def _check_how(rel, spec: dict, all_macros: dict, explained: set[str] = frozense
             elif isinstance(e, dict):
                 if "run" in e:
                     target = e["run"]["macro"] if isinstance(e["run"], dict) else str(e["run"])
-                    if target not in all_macros:
+                    if _picked_option(target) is None and target not in all_macros:
                         problems.append(f"{rel}: how: runs unknown macro {target!r}")
                 for k in ("then", "else", "sub"):
                     if k in e:
@@ -337,6 +365,10 @@ def check(root: Path) -> list[str]:
             if "global" in p and str(p["global"]) not in globals_:
                 problems.append(f"{rel}: option {k!r} follows unknown global {p['global']!r} (game.yaml globals:)")
         for u in used:
+            picked = _picked_option(u)
+            if picked is not None:
+                problems += _check_picked(rel, name, picked, params, all_macros)
+                continue
             if u not in all_macros:
                 problems.append(f"{rel}: runs unknown macro {u!r}")
             elif u == name:
