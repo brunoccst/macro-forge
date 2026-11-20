@@ -113,8 +113,8 @@ runner and the pack check ignore keys they don't know. The step reads the block 
 it names in its argument, `(ctx.findMacro(name) as? FlowScenario)?.spec?.get("<key>")` (and for
 "How it works", `env.file("macros/<group>/<name>.yaml")`). So the data travels with its macro,
 one file per macro instead of one shared data file, and a draft saved through the connector runs
-with its own data at once. The step names the macro rather than reading "the running macro",
-because a macro can also run inside a routine or another macro.
+with its own data at once. "How it works" only gets the
+step's argument, which is why the step names its macro.
 
 ### Routines: macros one after another
 
