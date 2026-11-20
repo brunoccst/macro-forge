@@ -36,7 +36,7 @@ class ClaudeSafetyTest {
     }
 
     @Test fun ordinaryScreensAreOk() {
-        val lines = listOf(line("Quest", 0.3, 0.2), line("Menu", 0.9, 0.1), line("Baruoki", 0.5, 0.05))
+        val lines = listOf(line("Quest", 0.3, 0.2), line("Menu", 0.9, 0.1), line("Village", 0.5, 0.05))
         assertEquals(ClaudeSafety.Verdict.Ok, ClaudeSafety.judge(lines, Point(0.3, 0.2)))
         // "Reselling" or "Released" in a story line far from the tap don't trigger
         assertEquals(ClaudeSafety.Verdict.Ok, ClaudeSafety.judge(listOf(line("The seal was released long ago", 0.5, 0.8)), Point(0.5, 0.2)))
