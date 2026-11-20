@@ -84,7 +84,7 @@ Actions (one key each):
 | `set: {var: expr}`, `count: stat`, `stop: "reason"` | variables, counters, end the run (`stop: "failed: why"` ends it as failed, like getting stuck: see Routines) |
 | `got: "reward text {expr}"` or `got: {item: "Name", n: expr}` | what the macro got (the items a reward text names, "Gold Coin x5"): shown in the outcome message at the end and kept on the Statistics page |
 | `if: expr` + `then:` / `else:`, `repeat: {times: expr, do: [...]}` | control flow |
-| `run: macro` / `run: {macro, params, until}` | run another macro (basic macros are made for this), sets `result`. `macro: "{option}"` runs the macro picked in that option: an option with `choices:` that are macro names, plus `off` for none (check `option != 'off'` before the `run:`). That macro runs with its own saved options and the step's `params:`; its options aren't taken over |
+| `run: macro` / `run: {macro, params, until}` | run another macro (basic macros are made for this), sets `result`. `macro: "{option}"` runs the macro picked in that option: an option with `choices:` that are macro names, plus `none` for no macro (check `option != 'none'` before the `run:`; not `off`, which reads as false). That macro runs with its own saved options and the step's `params:`; its options aren't taken over |
 | any step of the game plugin | the game's own steps, written in Kotlin (game.yaml `plugin:`, see [game-profile.md](game-profile.md)) |
 
 Expressions can use the params, variables and `found('t')`, `captured('t')`, `text_has('s')`,

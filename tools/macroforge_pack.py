@@ -106,11 +106,11 @@ def _picked_option(target: str) -> str | None:
 
 
 # a choice of a macro-picking option that runs nothing (the macro checks for it before its run:)
-NO_MACRO = "off"
+NO_MACRO = "none"
 
 
 def _check_picked(rel, name: str, option: str, params: dict, all_macros: dict) -> list[str]:
-    """A `run:` whose macro is picked in an option: that option lists macros to pick from (or off)."""
+    """A `run:` whose macro is picked in an option: that option lists macros to pick from (or none)."""
     p = params.get(option)
     choices = p.get("choices") if isinstance(p, dict) else None
     if not choices:

@@ -61,8 +61,8 @@ def test_runs_the_macro_picked_in_an_option(tmp_path):
     d.mkdir(parents=True)
     (d / "a.yaml").write_text("name: a\ngroup: basic\nhow: [x]\nunknown: [{wait: 1}]\n")
     (d / "b.yaml").write_text(
-        "name: b\ngroup: basic\nhow: [x]\nparams:\n  pick: {default: 'off', choices: ['off', a]}\n"
-        "setup: [{if: \"pick != 'off'\", then: [{run: {macro: '{pick}'}}]}]\n")
+        "name: b\ngroup: basic\nhow: [x]\nparams:\n  pick: {default: none, choices: ['none', a]}\n"
+        "setup: [{if: \"pick != 'none'\", then: [{run: {macro: '{pick}'}}]}]\n")
     assert mp.check(tmp_path) == []
     (d / "b.yaml").write_text(
         "name: b\ngroup: basic\nhow: [x]\nparams:\n  pick: {default: a, choices: [a, nope, b]}\n  free: {default: a}\n"
