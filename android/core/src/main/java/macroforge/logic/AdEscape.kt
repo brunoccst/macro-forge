@@ -17,13 +17,12 @@ import macroforge.MacroLog
  * then closes every activity above the game's (the commercial) and hands the running game the
  * intent, so the game carries on where it was (it isn't restarted). Nothing is tapped inside the
  * commercial (never its "Play Now" or a store page). The commercial's reward is usually lost.
- * Phone-tested 11-16: an AppLovin playable came straight back (and played again) after this.
+ * Some commercials come straight back (and play again) after this.
  *
  * [forceClose]: the last resort. Recent apps, then swipe the game's own card away (found by the
  * game's name in the recents screen's accessibility nodes, so no other app's card is touched, and
  * nothing else there, such as "Close all", is pressed), then Home. The game process ends with the
- * commercial; the caller starts the game again. Phone-tested 11-16 on a Samsung (One UI): it
- * freed the phone from that AppLovin playable; the game then started fresh.
+ * commercial; the caller starts the game again (fresh).
  */
 object AdEscape {
     fun home(): Boolean = InputService.instance?.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME) ?: false
