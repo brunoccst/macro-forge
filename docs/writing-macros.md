@@ -132,6 +132,24 @@ required: [open-app]   # it failed: skip to close-app instead of letting every s
 always: [close-app]
 ```
 
+A step can also be `{macro, params}`: that macro with the options given (on top of its own
+saved ones). With `macro: "{option}"` it runs the macro the user picks in the routine's own
+option: an option whose `choices:` are macro names, plus `none` to leave the step out. `{option}`
+in a param value is that option's value. The same picked step can come twice, sharing the option:
+
+```yaml
+name: daily-routine
+params:
+  boss: {default: none, choices: [none, fight-golem, fight-dragon], help: "the boss to fight; none = no boss"}
+  boss_party: {default: 1, choices: [1, 2, 3], help: "the party for the boss"}
+steps:
+  - open-app
+  - {macro: "{boss}", params: {tries: 3, party: "{boss_party}"}}
+  - watch-ads
+  - {macro: "{boss}", params: {tries: 3, party: "{boss_party}"}}
+  - close-app
+```
+
 A safety stop or ■ still ends the whole routine at once.
 
 ### "How it works": the steps in plain words
