@@ -107,6 +107,15 @@ current list is the comment at the top of `android/core/src/main/java/macroforge
 A new step written in Kotlin goes in `logic/FlowRun.kt` if any game could use it, else in the
 game's plugin (see [logic-pack.md](logic-pack.md)).
 
+**Data for a game step.** A macro file may carry more top-level keys than the format above: a
+block of data that one of the game plugin's steps reads (a map's layout, a fixed route). The
+runner and the pack check ignore keys they don't know. The step reads the block from the macro
+it names in its argument, `(ctx.findMacro(name) as? FlowScenario)?.spec?.get("<key>")` (and for
+"How it works", `env.file("macros/<group>/<name>.yaml")`). So the data travels with its macro,
+one file per macro instead of one shared data file, and a draft saved through the connector runs
+with its own data at once. The step names the macro rather than reading "the running macro",
+because a macro can also run inside a routine or another macro.
+
 ### Routines: macros one after another
 
 A routine has `steps:` instead of screens and handlers. Each step is a macro that runs with its own
