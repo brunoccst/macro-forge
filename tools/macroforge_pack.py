@@ -99,18 +99,23 @@ def _runs(actions) -> list[str]:
     return names
 
 
+def _step_name(step) -> str:
+    """A routine step's macro: the step itself, or its macro: ({macro, params})."""
+    return str(step.get("macro")) if isinstance(step, dict) else str(step)
+
+
 def _picked_option(target: str) -> str | None:
-    """The option a `run: {macro: "{option}"}` takes the macro's name from (None: a plain name)."""
+    """The option a routine step {macro: "{option}"} takes the macro's name from (None: a plain name)."""
     m = re.fullmatch(r"\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}", target.strip())
     return m.group(1) if m else None
 
 
-# a choice of a macro-picking option that runs nothing (the macro checks for it before its run:)
+# a choice of a macro-picking option that runs nothing (the routine leaves the step out; Routine.kt)
 NO_MACRO = "none"
 
 
 def _check_picked(rel, name: str, option: str, params: dict, all_macros: dict) -> list[str]:
-    """A `run:` whose macro is picked in an option: that option lists macros to pick from (or none)."""
+    """A routine step whose macro is picked in an option: that option lists macros to pick from (or none)."""
     p = params.get(option)
     choices = p.get("choices") if isinstance(p, dict) else None
     if not choices:
@@ -324,11 +329,16 @@ def check(root: Path) -> list[str]:
         used = _runs(spec.get("setup")) + _runs(spec.get("unknown"))
         for acts in (spec.get("handlers") or {}).values():
             used += _runs(acts)
-        used += [str(s) for s in spec.get("steps") or []]
+        # a routine step: a macro's name, or {macro, params} (macro "{option}": the one picked there)
+        step_names = [_step_name(s) for s in spec.get("steps") or []]
+        used += step_names
+        for s in spec.get("steps") or []:
+            if isinstance(s, dict) and not isinstance(s.get("params", {}), dict):
+                problems.append(f"{rel}: step {_step_name(s)!r}: params must be a map")
         # a routine's required: / always: name some of its own steps (see the app's Routine.kt)
         for key in ("required", "always"):
             for s in spec.get(key) or []:
-                if str(s) not in {str(x) for x in spec.get("steps") or []}:
+                if str(s) not in step_names:
                     problems.append(f"{rel}: {key}: {s!r} is not one of its steps")
         # max_visits: (loop guard) names its own screens with a whole number of visits
         mv = spec.get("max_visits") or {}

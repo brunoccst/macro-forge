@@ -70,8 +70,17 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
         internal set
     override val params: Map<String, Param> get() = ownParams + innerParams
     override val screens: List<String> = list(spec["screens"]).map { it.toString() }
-    /** A routine: other macros run one after another (steps: [start-game, daily-ads, ...]). */
-    val steps: List<String> = list(spec["steps"]).map { it.toString() }
+    /**
+     * A routine: other macros run one after another (steps: [start-game, daily-ads, ...]). A step
+     * can also be {macro, params}: the macro, or "{option}" for the one picked in the routine's
+     * option, with options for it ("{option}" in a value: that option's value); see [Routine.fill].
+     */
+    val routineSteps: List<RoutineStep> = list(spec["steps"]).map { s ->
+        mapOrNull(s)?.let { m -> RoutineStep(m["macro"].toString(), map(m["params"]).entries.associate { (k, v) -> k to Expr.str(v) }) }
+            ?: RoutineStep(s.toString(), emptyMap())
+    }
+    /** The routine's steps by macro name (as written: "{option}" for a picked one). */
+    val steps: List<String> = routineSteps.map { it.macro }
     /**
      * A routine's steps the rest depends on (`required: [start-game]`): when one of them fails
      * ([Routine.failed]), the steps after it are skipped, except the [always] ones.
@@ -127,8 +136,6 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
                     "repeat" in m -> walk(map(m["repeat"])["do"])
                     "run" in m -> {
                         val target = runTarget(m["run"])
-                        // a name picked in an option ("{dungeon}") is only known when it runs
-                        if ('{' in target) continue
                         found += target
                         val keys = map(mapOrNull(m["run"])?.get("params")).keys
                         given[target] = given[target]?.intersect(keys) ?: keys
@@ -138,7 +145,8 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
             }
         }
         walk(spec["setup"]); walk(spec["unknown"]); handlers.values.forEach { walk(it) }
-        found += steps
+        // a macro picked in an option ("{dungeon}") is only known when the routine runs
+        found += steps.filter { '{' !in it }
         found += list(spec["uses"]).map { it.toString() }
         uses = found.distinct()
         givenTo = given
@@ -182,3 +190,6 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
         }
     }
 }
+
+/** One step of a routine: the macro (or "{option}": the one picked in that option) and the options it gets. */
+data class RoutineStep(val macro: String, val params: Map<String, String>)

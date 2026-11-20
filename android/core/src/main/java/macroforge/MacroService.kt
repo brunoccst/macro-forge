@@ -128,11 +128,16 @@ class MacroService : Service() {
             val missing = ArrayList<String>()
             val skipped = ArrayList<String>()
             var skipping: String? = null
+            // the routine's own options (defaults, globals): the steps picked in them and their options
+            val options = Runner.resolve(flow, params)
             RunSummary.hide()
             val routineStart = System.currentTimeMillis()
             var routineEnd = "finished"
             try {
-                for ((i, step) in steps.withIndex()) {
+                for ((i, routineStep) in flow.routineSteps.withIndex()) {
+                    val picked = Routine.fill(routineStep, options)
+                    if (picked == null) { results += "${routineStep.macro}: none picked"; continue }
+                    val (step, given) = picked
                     if (!Routine.runs(step, skipping, flow.always)) { skipped += step; results += "$step: skipped ($skipping)"; continue }
                     val sub = try { Scenarios.get(this, step) } catch (e: Exception) {
                         results += "$step: ${e.message ?: "unknown macro"}"; missing += step
@@ -142,8 +147,8 @@ class MacroService : Service() {
                     updateNotification("${scenario.name}: $step (${i + 1}/${steps.size})")
                     MacroLog.prefix = "${scenario.name} ${i + 1}/${steps.size}"
                     MacroLog.i("${scenario.name}: step ${i + 1}/${steps.size} $step")
-                    // the step's own options, then the routine's own settings for it (see InnerParams)
-                    val reason = Runner.run(sub, MacroParams.load(this, step) + InnerParams.scoped(params, step), cap, this, source = source, routine = scenario.name)
+                    // the step's own options, then the routine's own settings for it (see InnerParams), then the step's params
+                    val reason = Runner.run(sub, MacroParams.load(this, step) + InnerParams.scoped(params, step) + given, cap, this, source = source, routine = scenario.name)
                     results += "$step: $reason"
                     if (reason == "stop requested") { routineEnd = reason; break }
                     if (reason.startsWith("safety stop")) { routineEnd = reason; MacroLog.i("${scenario.name}: safety stop, skipping the remaining steps"); break }

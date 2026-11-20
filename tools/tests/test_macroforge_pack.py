@@ -55,23 +55,24 @@ def test_runs_unknown_macro(tmp_path):
 
 
 
-def test_runs_the_macro_picked_in_an_option(tmp_path):
+def test_routine_runs_the_macro_picked_in_an_option(tmp_path):
     _game(tmp_path)
     d = tmp_path / "macros" / "basic"
     d.mkdir(parents=True)
     (d / "a.yaml").write_text("name: a\ngroup: basic\nhow: [x]\nunknown: [{wait: 1}]\n")
     (d / "b.yaml").write_text(
-        "name: b\ngroup: basic\nhow: [x]\nparams:\n  pick: {default: none, choices: ['none', a]}\n"
-        "setup: [{if: \"pick != 'none'\", then: [{run: {macro: '{pick}'}}]}]\n")
+        "name: b\ngroup: basic\nparams:\n  pick: {default: none, choices: [none, a]}\n"
+        "steps: [a, {macro: '{pick}', params: {fast: true}}]\nalways: [a]\n")
     assert mp.check(tmp_path) == []
     (d / "b.yaml").write_text(
-        "name: b\ngroup: basic\nhow: [x]\nparams:\n  pick: {default: a, choices: [a, nope, b]}\n  free: {default: a}\n"
-        "setup: [{run: {macro: '{pick}'}}, {run: '{free}'}, {run: '{missing}'}]\n")
+        "name: b\ngroup: basic\nparams:\n  pick: {default: a, choices: [a, nope, b]}\n  free: {default: a}\n"
+        "steps: [{macro: '{pick}'}, {macro: '{free}'}, {macro: '{missing}'}, {macro: a, params: [1]}]\n")
     problems = mp.check(tmp_path)
     assert any("choice 'nope' is not a macro" in p for p in problems)
     assert any("choice 'b' runs itself" in p for p in problems)
     assert any("picked in 'free'" in p for p in problems)
     assert any("picked in 'missing'" in p for p in problems)
+    assert any("params must be a map" in p for p in problems)
 
 
 def test_options_follow_known_globals(tmp_path):

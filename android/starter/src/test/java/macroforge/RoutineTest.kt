@@ -30,6 +30,18 @@ class RoutineTest {
         assertTrue(Routine.runs("inbox", null, always))
     }
 
+    @Test fun aStepPickedInAnOptionRunsThePickedMacro() {
+        val step = RoutineStep("{boss}", mapOf("tries" to "{boss_tries}", "fast" to "true"))
+        assertEquals("fight-boss" to mapOf("tries" to "3", "fast" to "true"), Routine.fill(step, mapOf("boss" to "fight-boss", "boss_tries" to "3")))
+        assertNull(Routine.fill(step, mapOf("boss" to "none")))
+        assertNull(Routine.fill(step, mapOf("boss" to " ")))
+        assertEquals("inbox" to emptyMap<String, String>(), Routine.fill(RoutineStep("inbox", emptyMap()), emptyMap()))
+        // a routine's steps: names, or {macro, params}
+        val r = FlowScenario(mapOf("name" to "r", "steps" to listOf("a", mapOf("macro" to "{boss}", "params" to mapOf("fast" to true)))), "r")
+        assertEquals(listOf("a", "{boss}"), r.steps)
+        assertEquals(mapOf("fast" to "true"), r.routineSteps[1].params)
+    }
+
     @Test fun theOutcomeSaysWhatWasSkipped() {
         val steps = listOf(
             RunStats.Record("start-game", 0L, 180_000L, "stuck on an unrecognised screen for 180s", routine = "daily-routine"),

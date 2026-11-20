@@ -84,7 +84,7 @@ Actions (one key each):
 | `set: {var: expr}`, `count: stat`, `stop: "reason"` | variables, counters, end the run (`stop: "failed: why"` ends it as failed, like getting stuck: see Routines) |
 | `got: "reward text {expr}"` or `got: {item: "Name", n: expr}` | what the macro got (the items a reward text names, "Gold Coin x5"): shown in the outcome message at the end and kept on the Statistics page |
 | `if: expr` + `then:` / `else:`, `repeat: {times: expr, do: [...]}` | control flow |
-| `run: macro` / `run: {macro, params, until}` | run another macro (basic macros are made for this), sets `result`. `macro: "{option}"` runs the macro picked in that option: an option with `choices:` that are macro names, plus `none` for no macro (check `option != 'none'` before the `run:`; not `off`, which reads as false). That macro runs with its own saved options and the step's `params:`; its options aren't taken over |
+| `run: macro` / `run: {macro, params, until}` | run another macro (basic macros are made for this), sets `result` |
 | any step of the game plugin | the game's own steps, written in Kotlin (game.yaml `plugin:`, see [game-profile.md](game-profile.md)) |
 
 Expressions can use the params, variables and `found('t')`, `captured('t')`, `text_has('s')`,
@@ -130,6 +130,24 @@ name: daily-routine
 steps: [open-app, collect-gifts, watch-ads, close-app]
 required: [open-app]   # it failed: skip to close-app instead of letting every step time out
 always: [close-app]
+```
+
+A step can also be `{macro, params}`: that macro with the options given (on top of its own
+saved ones). With `macro: "{option}"` it runs the macro the user picks in the routine's own
+option: an option whose `choices:` are macro names, plus `none` to leave the step out. `{option}`
+in a param value is that option's value. The same picked step can come twice, sharing the option:
+
+```yaml
+name: daily-routine
+params:
+  boss: {default: none, choices: [none, fight-golem, fight-dragon], help: "the boss to fight; none = no boss"}
+  boss_party: {default: 1, choices: [1, 2, 3], help: "the party for the boss"}
+steps:
+  - open-app
+  - {macro: "{boss}", params: {tries: 3, party: "{boss_party}"}}
+  - watch-ads
+  - {macro: "{boss}", params: {tries: 3, party: "{boss_party}"}}
+  - close-app
 ```
 
 A safety stop or ■ still ends the whole routine at once.
