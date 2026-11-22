@@ -35,6 +35,8 @@ data class Param(val default: String, val help: String, val choices: List<String
                  val global: String? = null) {
     val isBool get() = type == "bool"
     val isNumber get() = type == "number"
+    /** Choices picked from a list that filters as you type (`type: search`): for long lists. */
+    val isSearch get() = type == "search"
     /** Its key in the macro it comes from (skill_1 for battle.skill_1). */
     fun innerKey(key: String) = if (from == null) key else key.removePrefix("$from.")
 }

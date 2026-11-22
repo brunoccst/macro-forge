@@ -371,6 +371,9 @@ def check(root: Path) -> list[str]:
                     problems.append(f"{rel}: option {k!r} {ref} unknown option {p[ref]!r}")
             if "beside" in p and p.get("type") != "bool" and not isinstance(p.get("default"), bool):
                 problems.append(f"{rel}: option {k!r} has beside but is not a switch")
+            # type: search is a filterable list of its choices
+            if p.get("type") == "search" and not p.get("choices"):
+                problems.append(f"{rel}: option {k!r} is type: search but has no choices:")
             # global: names one of game.yaml's globals (the option follows it while set to "global")
             if "global" in p and str(p["global"]) not in globals_:
                 problems.append(f"{rel}: option {k!r} follows unknown global {p['global']!r} (game.yaml globals:)")

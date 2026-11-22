@@ -49,7 +49,8 @@ params:                               # its own options (the inner macros' come 
   max_gifts: {default: 3, help: "gifts to collect at most"}
   # option kinds: choices: [...] = pills; type: bool = switch (show_if: <switch> hides an option
   # while that switch is off; beside: <option> draws the switch on the side of that option's box);
-  # type: number = number box; anything else = text box
+  # type: number = number box; type: search + choices: = a box that opens the choices as a
+  # list with a filter (for long lists); anything else = text box
   # global: <key> = the option follows that global parameter (game.yaml globals:, set on
   # System → Settings → Global parameters): it gets a "Global" choice, its default unless it gives
   # another one, and while set to it the run uses the global's value

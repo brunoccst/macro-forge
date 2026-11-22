@@ -157,3 +157,14 @@ def test_check_yaml_walks_the_whole_repo(tmp_path):
     (tmp_path / "node_modules" / "skip.yaml").write_text(BROKEN)
     assert [p.split(":")[0] for p in mp.check_yaml(tmp_path)] == ["docs/x.yml"]
     assert mp.check_yaml(ROOT) == []
+
+
+def test_search_options_need_choices(tmp_path):
+    _game(tmp_path)
+    (tmp_path / "macros" / "daily").mkdir(parents=True)
+    (tmp_path / "macros" / "daily" / "x.yaml").write_text(
+        "name: x\ngroup: daily\nhow: [Go]\nparams:\n  a: {default: p, type: search, choices: [p, q]}\n"
+        "  b: {default: p, type: search}\nunknown: [{wait: 1}]\n")
+    problems = mp.check(tmp_path)
+    assert any("'b' is type: search but has no choices" in p for p in problems)
+    assert not any("'a'" in p for p in problems)
