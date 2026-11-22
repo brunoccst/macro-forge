@@ -599,6 +599,21 @@ class MacrosPage(private val a: MainActivity) {
                 // an option that follows a global parameter: "global" first, shown with the global's value
                 val choices = if (p.global != null && Globals.VALUE !in p.choices) listOf(Globals.VALUE) + p.choices else p.choices
                 val options = if (value in choices) choices else choices + value
+                fun label(o: String) = if (o == Globals.VALUE && p.global != null) Globals.label(a, p) else o
+                if (p.isSearch) {
+                    // a long list: a box showing the pick; tapping it opens the list with a filter
+                    var picked = value
+                    val field = Ui.text(a, label(picked) + "  ▾", 14f).apply {
+                        background = Ui.pressable(a, Ui.CARD_ALT, 12)
+                        setPadding(dp(12), dp(10), dp(12), dp(10))
+                    }
+                    field.setOnClickListener {
+                        searchList(Ui.title(p.innerKey(key)), options, ::label) { o -> picked = o; field.text = label(o) + "  ▾"; optionChanged(key) }
+                    }
+                    box.addView(field, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
+                    paramFields[key] = { picked }
+                    continue
+                }
                 // choices as a row of pills: tap one to pick it
                 var cur = value
                 val row = LinearLayout(a).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, dp(6), 0, 0) }
@@ -659,6 +674,44 @@ class MacrosPage(private val a: MainActivity) {
                 addView(switch(on) { v -> on = v; grey(); optionChanged(sideKey) })
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
         }
+    }
+
+    /** A list of [options] to pick one from, with a box that filters it as you type; [pick] gets the choice. */
+    private fun searchList(title: String, options: List<String>, label: (String) -> String, pick: (String) -> Unit) {
+        val shown = ArrayList(options)
+        val adapter = object : android.widget.ArrayAdapter<String>(a, android.R.layout.simple_list_item_1, ArrayList(shown.map(label))) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =
+                super.getView(position, convertView, parent).also { (it as? TextView)?.setTextColor(Ui.TEXT) }
+        }
+        val filter = EditText(a).apply {
+            hint = "Filter"
+            setSingleLine()
+            setTextColor(Ui.TEXT)
+            setHintTextColor(Ui.MUTED)
+            background = Ui.rounded(Ui.CARD_ALT, dp(12).toFloat())
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        val list = android.widget.ListView(a).apply { this.adapter = adapter }
+        val body = LinearLayout(a).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), 0)
+            addView(filter)
+            addView(list, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(320)))
+        }
+        val dialog = android.app.AlertDialog.Builder(a).setTitle(title).setView(body).setNegativeButton("Cancel", null).create()
+        // every word typed must be in the choice (case and -/_ ignored): "sea ice" finds sea-of-ice
+        fun norm(t: String) = t.lowercase().replace('-', ' ').replace('_', ' ')
+        filter.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(t: CharSequence?, st: Int, c: Int, after: Int) {}
+            override fun onTextChanged(t: CharSequence?, st: Int, before: Int, c: Int) {}
+            override fun afterTextChanged(e: android.text.Editable?) {
+                val words = norm(e?.toString().orEmpty()).split(' ').filter { it.isNotBlank() }
+                shown.clear(); shown += options.filter { o -> norm(label(o) + " " + o).let { t -> words.all { it in t } } }
+                adapter.clear(); adapter.addAll(shown.map(label))
+            }
+        })
+        list.setOnItemClickListener { _, _, i, _ -> pick(shown[i]); dialog.dismiss() }
+        dialog.show()
     }
 
     /**

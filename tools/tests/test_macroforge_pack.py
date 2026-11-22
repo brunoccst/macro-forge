@@ -54,6 +54,27 @@ def test_runs_unknown_macro(tmp_path):
     assert any("runs unknown macro 'nope'" in p for p in mp.check(tmp_path))
 
 
+
+def test_routine_runs_the_macro_picked_in_an_option(tmp_path):
+    _game(tmp_path)
+    d = tmp_path / "macros" / "basic"
+    d.mkdir(parents=True)
+    (d / "a.yaml").write_text("name: a\ngroup: basic\nhow: [x]\nunknown: [{wait: 1}]\n")
+    (d / "b.yaml").write_text(
+        "name: b\ngroup: basic\nparams:\n  pick: {default: none, choices: [none, a]}\n"
+        "steps: [a, {macro: '{pick}', params: {fast: true}}]\nalways: [a]\n")
+    assert mp.check(tmp_path) == []
+    (d / "b.yaml").write_text(
+        "name: b\ngroup: basic\nparams:\n  pick: {default: a, choices: [a, nope, b]}\n  free: {default: a}\n"
+        "steps: [{macro: '{pick}'}, {macro: '{free}'}, {macro: '{missing}'}, {macro: a, params: [1]}]\n")
+    problems = mp.check(tmp_path)
+    assert any("choice 'nope' is not a macro" in p for p in problems)
+    assert any("choice 'b' runs itself" in p for p in problems)
+    assert any("picked in 'free'" in p for p in problems)
+    assert any("picked in 'missing'" in p for p in problems)
+    assert any("params must be a map" in p for p in problems)
+
+
 def test_options_follow_known_globals(tmp_path):
     _game(tmp_path, globals={"team": {"default": "current", "choices": ["current", 1, 2]},
                              "bad": {"default": 9, "choices": [1, 2]}})
@@ -136,3 +157,14 @@ def test_check_yaml_walks_the_whole_repo(tmp_path):
     (tmp_path / "node_modules" / "skip.yaml").write_text(BROKEN)
     assert [p.split(":")[0] for p in mp.check_yaml(tmp_path)] == ["docs/x.yml"]
     assert mp.check_yaml(ROOT) == []
+
+
+def test_search_options_need_choices(tmp_path):
+    _game(tmp_path)
+    (tmp_path / "macros" / "daily").mkdir(parents=True)
+    (tmp_path / "macros" / "daily" / "x.yaml").write_text(
+        "name: x\ngroup: daily\nhow: [Go]\nparams:\n  a: {default: p, type: search, choices: [p, q]}\n"
+        "  b: {default: p, type: search}\nunknown: [{wait: 1}]\n")
+    problems = mp.check(tmp_path)
+    assert any("'b' is type: search but has no choices" in p for p in problems)
+    assert not any("'a'" in p for p in problems)

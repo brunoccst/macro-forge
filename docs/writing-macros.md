@@ -49,7 +49,8 @@ params:                               # its own options (the inner macros' come 
   max_gifts: {default: 3, help: "gifts to collect at most"}
   # option kinds: choices: [...] = pills; type: bool = switch (show_if: <switch> hides an option
   # while that switch is off; beside: <option> draws the switch on the side of that option's box);
-  # type: number = number box; anything else = text box
+  # type: number = number box; type: search + choices: = a box that opens the choices as a
+  # list with a filter (for long lists); anything else = text box
   # global: <key> = the option follows that global parameter (game.yaml globals:, set on
   # System → Settings → Global parameters): it gets a "Global" choice, its default unless it gives
   # another one, and while set to it the run uses the global's value
@@ -130,6 +131,24 @@ name: daily-routine
 steps: [open-app, collect-gifts, watch-ads, close-app]
 required: [open-app]   # it failed: skip to close-app instead of letting every step time out
 always: [close-app]
+```
+
+A step can also be `{macro, params}`: that macro with the options given (on top of its own
+saved ones). With `macro: "{option}"` it runs the macro the user picks in the routine's own
+option: an option whose `choices:` are macro names, plus `none` to leave the step out. `{option}`
+in a param value is that option's value. The same picked step can come twice, sharing the option:
+
+```yaml
+name: daily-routine
+params:
+  boss: {default: none, choices: [none, fight-golem, fight-dragon], help: "the boss to fight; none = no boss"}
+  boss_party: {default: 1, choices: [1, 2, 3], help: "the party for the boss"}
+steps:
+  - open-app
+  - {macro: "{boss}", params: {tries: 3, party: "{boss_party}"}}
+  - watch-ads
+  - {macro: "{boss}", params: {tries: 3, party: "{boss_party}"}}
+  - close-app
 ```
 
 A safety stop or ■ still ends the whole routine at once.

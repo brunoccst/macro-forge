@@ -37,7 +37,7 @@ object MacroDiagram {
         val steps = list(spec["steps"])
         if (steps.isNotEmpty()) {
             out += Section("Routine", "These macros run one after another; one that fails doesn't stop the rest.",
-                steps.map { Node.Call(it.toString(), "") })
+                steps.map { Node.Call(FlowScenario.runTarget(it), "") })
             return out
         }
         val setup = actions(spec["setup"])
