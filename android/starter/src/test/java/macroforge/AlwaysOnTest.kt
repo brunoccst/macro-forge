@@ -68,6 +68,19 @@ class AlwaysOnTest {
         assertEquals(d0 + day + 4 * h + 40 * m, DailySchedule.nextAt(d0 + 5 * h, 10, 4 * 60 + 30))
     }
 
+    @Test fun scheduleAfterFiring() {
+        val m = 60_000L
+        val h = 60 * m
+        val day = 24 * h
+        val slot = 20 * day + 15 * h + 10 * m // today's 15:10 UTC
+        // the alarm went off a second early: tomorrow, not the same slot again
+        assertEquals(slot + day, DailySchedule.nextAfterFiring(slot - 1_000, slot, 10, 15 * 60))
+        // on time or late: tomorrow
+        assertEquals(slot + day, DailySchedule.nextAfterFiring(slot + 7_000, slot, 10, 15 * 60))
+        // nothing armed before: from now
+        assertEquals(slot, DailySchedule.nextAfterFiring(slot - h, 0, 10, 15 * 60))
+    }
+
     @Test fun scheduleMissedAlarm() {
         val h = 3_600_000L
         val armed = 100 * h
