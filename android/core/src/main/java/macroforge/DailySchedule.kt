@@ -77,14 +77,26 @@ object DailySchedule {
         else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi) // inexact: can come late
     }
 
-    /** Set (or clear) the alarm for the next run. Called at start-up, on a reboot or app update, on a settings change and after each run. */
-    fun arm(c: Context) {
+    /**
+     * The next run after an alarm set for [armedAt] went off at [now]. Android can fire an exact alarm
+     * a moment early; counting from [now] alone would then pick the same slot again and run twice.
+     */
+    fun nextAfterFiring(now: Long, armedAt: Long, delayMin: Int, resetUtcMin: Int) =
+        nextAt(maxOf(now, armedAt), delayMin, resetUtcMin)
+
+    /**
+     * Set (or clear) the alarm for the next run. Called at start-up, on a reboot or app update, on a settings change and after each run.
+     * [firing]: called by the alarm that just went off, so never that alarm's own slot again.
+     */
+    fun arm(c: Context, firing: Boolean = false) {
         reportMissed(c)
         val am = c.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pi = intent(c, 0)
         am.cancel(pi)
         if (!enabled(c)) { prefs(c).edit().putLong("armed_at", 0).apply(); return }
-        val at = nextAt(System.currentTimeMillis(), delayMin(c), resetMin(c))
+        val now = System.currentTimeMillis()
+        val at = if (firing) nextAfterFiring(now, prefs(c).getLong("armed_at", 0), delayMin(c), resetMin(c))
+            else nextAt(now, delayMin(c), resetMin(c))
         setAlarm(am, at, pi)
         if (prefs(c).getLong("armed_at", 0) != at) MacroLog.i("schedule: next ${macro(c)} run ${phoneTime(at)}${if (exact(am)) "" else " (inexact alarm: may come late)"}")
         prefs(c).edit().putLong("armed_at", at).apply()
@@ -129,7 +141,7 @@ object DailySchedule {
         if (!enabled(c)) return
         if (attempt == 0) {
             prefs(c).edit().putLong("fired_at", System.currentTimeMillis()).apply()
-            arm(c) // tomorrow's, before anything else can go wrong
+            arm(c, firing = true) // tomorrow's, before anything else can go wrong
         }
         PhoneEvents.init(c)
         val name = macro(c)
