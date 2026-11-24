@@ -87,7 +87,7 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
             "leave_ad" in a -> AdEscape.leave(ctx)
             // the last resort: swipe the game away in recent apps; sets `closed`
             "force_close" in a -> vars["closed"] = AdEscape.forceClose(ctx)
-            "wait" in a -> ctx.wait(num(ctx, a["wait"]))
+            "wait" in a -> ctx.timed("wait") { ctx.wait(num(ctx, a["wait"])) }
             "launch" in a -> ctx.launchApp(Expr.str(value(ctx, a["launch"])))
             "log" in a -> MacroLog.i(text(ctx, a["log"]))
             "status" in a -> MacroLog.status("$name: ${text(ctx, a["status"])}")
@@ -113,7 +113,8 @@ class FlowRun(private val scenario: FlowScenario, private val plugin: GamePlugin
                 vars["result"] = Runner.runInside(sub, given, ctx, until)
             }
             // a step of the game's own (fights, quests, ...)
-            else -> plugin.actions.firstOrNull { it in a }?.let { game.run(macro(ctx), it, a) }
+            // (timed by its name: a game step can be most of a run, e.g. a dungeon)
+            else -> plugin.actions.firstOrNull { it in a }?.let { ctx.timed(it) { game.run(macro(ctx), it, a) } }
                 ?: throw IllegalArgumentException("$name: unknown action ${a.keys}")
         }
     }
