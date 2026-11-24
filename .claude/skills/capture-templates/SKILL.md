@@ -6,7 +6,7 @@ description: Capture missing screen templates for a macro-forge game app from th
 # Capture templates from the phone
 
 This needs the live phone through the app's phone connector (the app open with screen capture,
-taps and the connector on; see `docs/android-app.md`). The game repo's own skill or CLAUDE.md
+taps and the connector on; see `docs/android-app.md`). The game repo's own skill or AGENTS.md
 names its connector and setup guide.
 
 1. Find what is missing: entries in a `library.yaml` with no `file`/`ref` yet. The template
