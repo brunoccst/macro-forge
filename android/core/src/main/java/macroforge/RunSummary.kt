@@ -64,6 +64,7 @@ object RunSummary {
         if (o != RunStats.Outcome.DONE) lines += where(r)
         r.shot?.let { lines += shotLine(it) }
         lines += body(listOf(r))
+        timeLine(r)?.let { lines += it }
         return Outcome(title, o == RunStats.Outcome.DONE || o == RunStats.Outcome.STOPPED, lines, r.macro)
     }
 
@@ -80,7 +81,7 @@ object RunSummary {
             else -> "$name finished with problems"
         } + " (${steps.size} step(s), ${RunStats.duration(ms)})"
         val lines = ArrayList<String>()
-        for (s in steps) lines += "${mark(s.outcome)} ${pretty(s.macro)}: ${s.reason}"
+        for (s in steps) lines += "${mark(s.outcome)} ${pretty(s.macro)} (${RunStats.duration(s.ms)}): ${s.reason}"
         for (m in missing) lines += "✕ $m: " + (LoadProblems.forMacro(m)?.let { if (it.kind == "newer") "needs a newer app (${it.message})" else "its file ${it.file} is broken (${it.message})" }
             ?: "unknown macro (update the macros)")
         if (end.startsWith("safety stop")) lines += "The remaining steps were skipped after the safety stop."
@@ -91,6 +92,13 @@ object RunSummary {
         }
         lines += body(steps)
         return Outcome(title, bad.none { it.outcome != RunStats.Outcome.STOPPED } && missing.isEmpty() && skipping == null, lines, routine)
+    }
+
+    /** Where the run's time went: the parts that took longest themselves ([Timings.hotspots]). */
+    fun timeLine(r: RunStats.Record, top: Int = 5): String? {
+        val h = Timings.hotspots(r.times, top, minMs = maxOf(1000, r.ms / 50))
+        if (h.isEmpty()) return null
+        return "Time went to: " + h.joinToString("; ") { Timings.line(it.first, it.second, r.ms) }
     }
 
     private fun mark(o: RunStats.Outcome) = when (o) {

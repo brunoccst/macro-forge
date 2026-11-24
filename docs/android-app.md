@@ -29,7 +29,16 @@ A sidebar (≡ at the top left) switches between four pages, all in `MainActivit
   (`files/stats/runs.jsonl`: start, end, stop reason, counters, who started it, the routine it
   was a step of, and the run reports written to `runs.log`, shown as game.yaml `reports:` says).
   Totals, runs and minutes per day, time by macro; per macro its totals, run lengths, stop
-  reasons, items and rewards read. "Clear" removes all statistics or one macro's.
+  reasons, items and rewards read, and where the time goes (below). "Clear" removes all statistics or one macro's.
+- **Where the time goes** (`Timings.kt`): every run times its parts in memory, with no log
+  lines, and saves them with the run (`times`: each part by path, its time and how often). The
+  runner times the screen handlers (`on <screen>`), the setup and the macros run inside
+  (by name); the YAML steps time the game's own steps (by their name) and `wait`; logic code
+  times its own parts with `ctx.timed("label") { ... }` (they nest: `quest_step › map 2 › fish`).
+  The Statistics page lists, per macro, the parts that took longest themselves (their own time,
+  without the parts inside them), per run and as a share of the time; each run's card, the
+  outcome message (and macro_status) and one `time:` log line at the end name the top ones.
+  A routine's outcome gives each step's duration.
 - **System** (`SystemPage.kt`), in tabs: Setup (taps, screen capture), Claude (the phone
   connector and what Claude may do), Settings (with the Global parameters, `Globals.kt`), Updates and Log.
 

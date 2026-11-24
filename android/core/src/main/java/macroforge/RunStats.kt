@@ -48,6 +48,8 @@ object RunStats {
         val screen: String? = null,
         /** The screenshot saved when it got stuck or failed ([StuckShots] file name), if any. */
         val shot: String? = null,
+        /** Where the time went: each timed part of the run by path, its time and how often ([Timings]). */
+        val times: Map<String, Timings.Entry> = emptyMap(),
     ) {
         val ms get() = (end - start).coerceAtLeast(0)
         val outcome get() = classify(reason)
@@ -96,6 +98,7 @@ object RunStats {
         if (!r.step.isNullOrEmpty()) m["step"] = r.step
         if (!r.screen.isNullOrEmpty()) m["screen"] = r.screen
         if (!r.shot.isNullOrEmpty()) m["shot"] = r.shot
+        if (r.times.isNotEmpty()) m["times"] = Timings.toJson(r.times)
         return json.writeValueAsString(m)
     }
 
@@ -115,6 +118,7 @@ object RunStats {
             step = m["step"]?.toString(),
             screen = m["screen"]?.toString(),
             shot = m["shot"]?.toString(),
+            times = Timings.fromJson(m["times"]),
         )
     }.getOrNull()
 

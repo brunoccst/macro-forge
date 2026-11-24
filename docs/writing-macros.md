@@ -33,6 +33,11 @@ makes macros tolerant of missed taps, lag and popups. If the screen stays unreco
 `unknown_timeout_s`, the run stops and says so: add a screen for that state, or raise the
 timeout.
 
+Every run also records **where its time goes**, with no extra log lines: each screen's handlers
+(`on <screen>`), each macro run inside it, each game step and `wait`. The Statistics page and the
+outcome message show the parts that took longest (see `docs/android-app.md`). Logic code can time
+its own parts with `ctx.timed("label") { ... }`.
+
 Positions are **fractions of the screen** (0..1), so a macro works on any resolution. Templates
 remember the resolution they were cut from and are rescaled by height (the game runs in
 landscape and its UI scales with the short side).

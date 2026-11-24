@@ -48,8 +48,8 @@ class RunSummaryTest {
         val o = RunSummary.ofRoutine("daily-routine", steps, emptyList(), "finished", 600_000L)
         assertFalse(o.ok)
         assertTrue(o.title, o.title.startsWith("Daily routine finished with problems (3 step(s)"))
-        assertTrue(o.text, o.lines.contains("✓ Daily ads: all of today's commercials are done"))
-        assertTrue(o.text, o.lines.contains("✕ Shop ad: error: IllegalStateException: boom"))
+        assertTrue(o.text, o.lines.contains("✓ Daily ads (1m 35s): all of today's commercials are done"))
+        assertTrue(o.text, o.lines.contains("✕ Shop ad (1m 35s): error: IllegalStateException: boom"))
         assertTrue(o.text, o.text.contains("Shop ad — doing \"shop-ad: looking for the commercial button\""))
         assertTrue(o.text, o.lines.contains("Got: Gold Coin ×55"))
     }

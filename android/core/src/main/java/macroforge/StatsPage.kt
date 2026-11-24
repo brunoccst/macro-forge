@@ -198,6 +198,23 @@ class StatsPage(private val a: MainActivity) {
             addView(Charts.rows(a, s.reasons.take(8).map { Triple(it.first, it.second.toDouble(), it.second.toString()) }) { Ui.MUTED })
         })
 
+        // where the time goes: the parts that took longest themselves, over the runs that were timed
+        val timed = runs.filter { it.times.isNotEmpty() }
+        if (timed.isNotEmpty()) {
+            val times = Timings.sum(timed.map { it.times })
+            val total = timed.sumOf { it.ms }
+            val hot = Timings.hotspots(times, top = 12, minMs = 0)
+            detail.addView(Ui.section(a, "Where the time goes · ${timed.size} timed run(s)"))
+            detail.addView(Ui.card(a).apply {
+                addView(Charts.rows(a, hot.map { (path, e) ->
+                    Triple(path, e.ms.toDouble(), "${RunStats.duration(e.ms / timed.size)} a run · ${pct(e.ms, total)}" +
+                        if (e.n > timed.size) " · ${Charts.fmt(e.n.toDouble() / timed.size)}× a run" else "")
+                }))
+                addView(Ui.text(a, "Each part's own time, not counting the parts inside it (\"a › b\": b happens inside a). " +
+                    "The rest of a run is spent recognising screens between steps.", 12f, Ui.MUTED).apply { setPadding(0, dp(8), 0, 0) })
+            })
+        }
+
         if (s.counts.isNotEmpty()) {
             detail.addView(Ui.section(a, "Counted over all runs"))
             detail.addView(Ui.card(a).apply {
@@ -256,6 +273,7 @@ class StatsPage(private val a: MainActivity) {
         if (r.counts.isNotEmpty()) bits += r.counts.entries.joinToString(", ") { "${Ui.title(it.key).lowercase()} ${it.value}" }
         if (bits.isNotEmpty()) addView(Ui.text(a, bits.joinToString(" · "), 12.5f).apply { setPadding(0, dp(4), 0, 0) })
         for (rep in r.reports) more.addView(Ui.text(a, RunSummary.reportLine(rep), 12.5f, Ui.MUTED).apply { setPadding(0, dp(6), 0, 0) })
+        RunSummary.timeLine(r, top = 8)?.let { more.addView(Ui.text(a, it, 12.5f, Ui.MUTED).apply { setPadding(0, dp(6), 0, 0) }) }
         addView(more)
         setOnClickListener {
             val open = more.visibility != View.VISIBLE
@@ -274,6 +292,7 @@ class StatsPage(private val a: MainActivity) {
     }
 
     private fun pct(n: Int, of: Int) = if (of <= 0) "-" else "${(100.0 * n / of).toInt()}%"
+    private fun pct(n: Long, of: Long) = if (of <= 0) "-" else "${(100.0 * n / of).toInt()}%"
     private fun shortDay(ms: Long) = SimpleDateFormat("d/M", Locale.getDefault()).format(Date(ms))
     private fun longDay(ms: Long) = SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(Date(ms))
     private fun time(ms: Long) = SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(ms))

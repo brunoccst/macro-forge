@@ -50,7 +50,12 @@ class Context(
     private val stopRequested: AtomicBoolean,
     /** How many macros this one runs inside (Flow's run:); 0 for the macro the user started. */
     val depth: Int = 0,
+    /** Where the run's time goes; shared with the macros it runs (theirs nest under their names). */
+    val timings: Timings = Timings(),
 ) {
+    /** Time [block] as the part [label] of the run ([Timings]): e.g. a dungeon's map, a leg, a battle. */
+    fun <T> timed(label: String, block: () -> T): T = timings.timed(label, block)
+
     val stats = LinkedHashMap<String, Int>()
     /** What the macro got (rewards, items), for the outcome message and the Statistics page. */
     val items = LinkedHashMap<String, Int>()
@@ -296,7 +301,7 @@ class Context(
 
     /** A context for a macro run inside this one: same screen, input, stop and pause. */
     fun child(vision: Vision, params: Map<String, String>) =
-        Context(capture, files, vision, params, stopRequested, depth + 1).also {
+        Context(capture, files, vision, params, stopRequested, depth + 1, timings).also {
             it.debugDir = debugDir; it.findMacro = findMacro; it.userTemplates = userTemplates; it.optionsOf = optionsOf
         }
 
@@ -554,7 +559,11 @@ object Runner {
         val shot = if (StuckShots.wanted(reason)) saveStuckShot(capture, app, scenario.name, reason, step, lastScreen) else null
         val record = RunStats.Record(scenario.name, startedAt, System.currentTimeMillis(), reason, HashMap(ctx.stats),
             runCatching { RunStats.reportsSince(app.filesDir, reportsMark) }.getOrDefault(emptyList()), source, routine,
-            LinkedHashMap(ctx.items), step, lastScreen, shot)
+            LinkedHashMap(ctx.items), step, lastScreen, shot, ctx.timings.snapshot())
+        // where the time went, in one line (the parts themselves are in the run's statistics)
+        Timings.hotspots(record.times, 5).takeIf { it.isNotEmpty() }?.let { h ->
+            MacroLog.i("time: " + h.joinToString("; ") { Timings.line(it.first, it.second, record.ms) })
+        }
         runCatching { RunStats.record(record) }.onFailure { MacroLog.e("could not save the run's statistics", it) }
         // the outcome message: once at the end (a routine shows one for all its steps when it ends)
         // (runs Claude started: the text goes to macro_status, and the card would cover its screenshots)
@@ -606,7 +615,7 @@ object Runner {
         val ctx = parent.child(Vision(lib), params)
         MacroLog.i("running ${sub.name} inside it with $params")
         val reason = try {
-            loop(sub, ctx, until)
+            parent.timed(sub.name) { loop(sub, ctx, until) }
             "finished"
         } catch (s: StopScenario) {
             s.message ?: "stopped"
@@ -625,7 +634,7 @@ object Runner {
         val library = ctx.vision.library
         val missing = scenario.screens.flatMap { library.screens[it]?.require ?: emptyList() }.filter { it in library.missing() }
         if (missing.isNotEmpty()) MacroLog.i("templates not captured yet: ${missing.distinct().joinToString()}")
-        scenario.setup(ctx)
+        ctx.timed("setup") { scenario.setup(ctx) }
         var unknownSince: Long? = null
         var last: String? = "-"
         val visits = HashMap<String, Int>()
@@ -660,10 +669,10 @@ object Runner {
                 if (now - unknownSince > scenario.unknownTimeoutS * 1000) {
                     ctx.stop("stuck on an unrecognised screen for ${scenario.unknownTimeoutS.toInt()}s")
                 }
-                if (!closeNotRespondingDialog(ctx)) scenario.onUnknown(ctx)
+                if (!closeNotRespondingDialog(ctx)) ctx.timed("unknown screen") { scenario.onUnknown(ctx) }
             } else {
                 unknownSince = null
-                scenario.onScreen(ctx, screen)
+                ctx.timed("on $screen") { scenario.onScreen(ctx, screen) }
             }
             Thread.sleep((scenario.tickS * 1000).toLong())
         }
