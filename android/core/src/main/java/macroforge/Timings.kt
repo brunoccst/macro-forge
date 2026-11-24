@@ -5,7 +5,7 @@ package macroforge
  * memory only (no log lines) and saved with the run's statistics ([RunStats.Record.times]).
  *
  * A part is timed with [timed]; parts timed inside it are its children, so every entry is a path
- * ("another_dungeon › map 2 › fish"). An entry's time includes its children's. The runner times
+ * ("quest_step › map 2 › fish"). An entry's time includes its children's. The runner times
  * the screen handlers and the macros run inside each other by itself, the YAML steps time the
  * game's own steps and waits, and logic code times its own parts (a dungeon's maps, legs, battles).
  */

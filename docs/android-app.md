@@ -34,7 +34,7 @@ A sidebar (≡ at the top left) switches between four pages, all in `MainActivit
   lines, and saves them with the run (`times`: each part by path, its time and how often). The
   runner times the screen handlers (`on <screen>`), the setup and the macros run inside
   (by name); the YAML steps time the game's own steps (by their name) and `wait`; logic code
-  times its own parts with `ctx.timed("label") { ... }` (they nest: `another_step › map 2 › fish`).
+  times its own parts with `ctx.timed("label") { ... }` (they nest: `quest_step › map 2 › fish`).
   The Statistics page lists, per macro, the parts that took longest themselves (their own time,
   without the parts inside them), per run and as a share of the time; each run's card, the
   outcome message (and macro_status) and one `time:` log line at the end name the top ones.
