@@ -44,6 +44,18 @@ class TimingsTest {
         assertEquals(Timings.MAX_PARTS, t.snapshot().size)
     }
 
+    @Test fun beginAndEndAroundALoop() {
+        val t = Timings()
+        for (i in 1..3) {
+            val p = t.begin("try")
+            try { t.begin("left open"); if (i == 2) continue; t.add("x", 1) } finally { t.end(p) }
+        }
+        t.add("after", 1)
+        val s = t.snapshot()
+        assertEquals(3, s.getValue("try").n)
+        assertTrue(s.keys.toString(), "after" in s) // the part left open inside ended with it
+    }
+
     @Test fun sinceGivesOneRound() {
         val t = Timings()
         t.add("walk", 1000)

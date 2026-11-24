@@ -18,21 +18,33 @@ class Timings {
 
     /** Run [block] as the part [label], inside whatever part is being timed now. */
     fun <T> timed(label: String, block: () -> T): T {
+        val part = begin(label)
+        try { return block() } finally { end(part) }
+    }
+
+    /** A part being timed ([begin]); null when nothing is timed (an empty label, or a cap reached). */
+    class Part internal constructor(internal val path: String, internal val depth: Int, internal val t0: Long)
+
+    /**
+     * Start the part [label] inside whatever part is being timed now; [end] it in a `finally`.
+     * For code that leaves the part with break, continue or return ([timed] is simpler otherwise).
+     */
+    fun begin(label: String): Part? = synchronized(this) {
         val name = clean(label)
-        if (name.isEmpty()) return block()
-        val path = synchronized(this) {
-            val p = (stack + name).joinToString(SEP)
-            // a cap on how many parts and how deep, so a run that times in a loop can't grow without end
-            if (stack.size >= MAX_DEPTH || (p !in entries && entries.size >= MAX_PARTS)) null else { stack += name; p }
-        } ?: return block()
-        val t0 = System.currentTimeMillis()
-        try {
-            return block()
-        } finally {
-            synchronized(this) {
-                if (stack.isNotEmpty()) stack.removeAt(stack.size - 1)
-                addAt(path, System.currentTimeMillis() - t0, 1)
-            }
+        if (name.isEmpty()) return@synchronized null
+        val p = (stack + name).joinToString(SEP)
+        // a cap on how many parts and how deep, so a run that times in a loop can't grow without end
+        if (stack.size >= MAX_DEPTH || (p !in entries && entries.size >= MAX_PARTS)) return@synchronized null
+        stack += name
+        Part(p, stack.size, System.currentTimeMillis())
+    }
+
+    /** End [part] (and any part started inside it and not ended). */
+    fun end(part: Part?) {
+        part ?: return
+        synchronized(this) {
+            while (stack.size >= part.depth) stack.removeAt(stack.size - 1)
+            addAt(part.path, System.currentTimeMillis() - part.t0, 1)
         }
     }
 
