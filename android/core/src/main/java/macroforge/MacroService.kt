@@ -154,6 +154,14 @@ class MacroService : Service() {
                     results += "$step: $reason"
                     if (reason == "stop requested") { routineEnd = reason; break }
                     if (reason.startsWith("safety stop")) { routineEnd = reason; MacroLog.i("${scenario.name}: safety stop, skipping the remaining steps"); break }
+                    // a failed step can leave the game on a screen the next steps don't know: the game's recovery macro
+                    // (game.yaml recovery_macro) clears it first, so one failure doesn't cascade
+                    val recovery = GameProfile.current.recoveryMacro
+                    if (Routine.recoversAfter(step, reason, Routine.skipAfter(step, reason, flow.required), recovery, i < flow.routineSteps.size - 1)) {
+                        MacroLog.i("${scenario.name}: $step failed, running $recovery before the next step")
+                        val recovered = try { Scenarios.get(this, recovery) } catch (e: Exception) { MacroLog.e(e.message ?: "unknown macro"); null }
+                        if (recovered != null) results += "$recovery (after $step): " + Runner.run(recovered, MacroParams.load(this, recovery), cap, this, source = source)
+                    }
                     if (skipping == null) Routine.skipAfter(step, reason, flow.required)?.let {
                         skipping = it
                         MacroLog.i("${scenario.name}: $it, skipping the remaining steps" +

@@ -25,6 +25,23 @@ class RoutineTest {
         assertEquals("start-game is not installed", Routine.skipAfter("start-game", null, required))
     }
 
+    @Test fun aFailedStepRunsTheRecoveryMacroBeforeTheNextOne() {
+        val stuck = "stuck on an unrecognised screen for 45s"
+        assertTrue(Routine.recoversAfter("daily-ads", stuck, null, "reset", true))
+        assertTrue(Routine.recoversAfter("daily-ads", "failed: no ad", null, "reset", true))
+        // nothing to recover: no recovery macro, finished step, last step, routine already skipping, or the recovery itself
+        assertFalse(Routine.recoversAfter("daily-ads", stuck, null, "", true))
+        assertFalse(Routine.recoversAfter("daily-ads", "finished", null, "reset", true))
+        assertFalse(Routine.recoversAfter("daily-ads", stuck, null, "reset", false))
+        assertFalse(Routine.recoversAfter("start-game", stuck, "start-game failed", "reset", true))
+        assertFalse(Routine.recoversAfter("reset", stuck, null, "reset", true))
+    }
+
+    @Test fun gameProfileReadsTheRecoveryMacro() {
+        assertEquals("reset", GameProfile.parse("name: X\nrecovery_macro: reset").recoveryMacro)
+        assertEquals("", GameProfile.parse("name: X").recoveryMacro)
+    }
+
     @Test fun otherStepsFailingDontStopTheRoutine() {
         assertNull(Routine.skipAfter("daily-ads", "stuck on an unrecognised screen for 45s", required))
         assertTrue(Routine.runs("inbox", null, always))
