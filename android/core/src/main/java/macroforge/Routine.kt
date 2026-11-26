@@ -5,10 +5,20 @@ package macroforge
  * before it did, unless a step the routine marks `required:` fails. Then the steps after it
  * are skipped (they'd only time out one after another without what it does, e.g. a game that
  * didn't open), except the ones marked `always:` (e.g. the one that turns the game off).
+ * A step the user switched off ([switchKey]) is skipped and listed as "skipped (off)".
  */
 object Routine {
     /** A picked step whose option says this runs nothing. */
     const val NONE = "none"
+
+    /**
+     * The routine option that switches a step on or off ("Include <step>", on by default): its key
+     * is `include_` and the step's macro name, or its option name for a picked step ("{dungeon}").
+     */
+    fun switchKey(macro: String) = "include_" + macro.trim('{', '}', ' ')
+
+    /** Whether the user switched [step] off in the routine's [options]. */
+    fun isOff(step: RoutineStep, options: Map<String, String>) = options[switchKey(step.macro)]?.trim()?.lowercase() == "false"
 
     /**
      * The macro and the options a routine step runs with, the routine's [options] filled in:

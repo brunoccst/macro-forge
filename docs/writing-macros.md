@@ -156,6 +156,12 @@ steps:
   - close-app
 ```
 
+Every step also gets a switch among the routine's options, made from its `steps:` list: "Include
+`<step>`" (key `include_<step>`, or `include_<option>` for a picked step; a repeated step shares one
+switch). They default to on. A step switched off is skipped, and the outcome lists it as
+"skipped (off)". A routine can declare an `include_<step>` option itself (its own default and
+help win). A picked step (`{option}`) that is `none` is still left out as before.
+
 A safety stop or ■ still ends the whole routine at once.
 
 ### "How it works": the steps in plain words
