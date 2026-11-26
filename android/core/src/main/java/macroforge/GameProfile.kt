@@ -57,6 +57,8 @@ data class GameProfile(
     val globals: Map<String, Param> = emptyMap(),
     /** The game's daily reset, in minutes after midnight UTC (`daily_reset: "15:00"`), or null if game.yaml has none. */
     val dailyResetUtcMin: Int? = null,
+    /** The macro a routine runs after one of its steps fails (`recovery_macro: some-macro`), or "" for none. */
+    val recoveryMacro: String = "",
 ) {
     /** The run reports macros write: [title] of the Statistics section, [fields] in line order. */
     data class Reports(val title: String, val fields: List<ReportField>)
@@ -139,6 +141,7 @@ data class GameProfile(
                     str(k) to Param(Expr.str(default), str(m["help"]), (m["choices"] as? List<*>).orEmpty().map { Expr.str(it) }, type)
                 },
                 dailyResetUtcMin = parseClock(str(y["daily_reset"])),
+                recoveryMacro = str(y["recovery_macro"]).trim(),
             )
         }
 

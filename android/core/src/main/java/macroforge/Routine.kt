@@ -51,4 +51,12 @@ object Routine {
         failed(reason) -> "$step failed"
         else -> null
     }
+
+    /**
+     * Whether the routine runs its [recovery] macro (game.yaml `recovery_macro`, "" = none) after
+     * [step] ended on [reason]: only when the step failed, the routine isn't already skipping, and
+     * [moreSteps] still follow. It never runs after itself.
+     */
+    fun recoversAfter(step: String, reason: String, skipping: String?, recovery: String, moreSteps: Boolean) =
+        recovery.isNotEmpty() && step != recovery && skipping == null && moreSteps && failed(reason)
 }

@@ -138,6 +138,10 @@ required: [open-app]   # it failed: skip to close-app instead of letting every s
 always: [close-app]
 ```
 
+When any step fails, the routine first runs the game's recovery macro (`recovery_macro:` in
+`game.yaml`, see game-profile.md) before the next step, so a screen the failed step left behind
+doesn't make the next steps fail too.
+
 A step can also be `{macro, params}`: that macro with the options given (on top of its own
 saved ones). With `macro: "{option}"` it runs the macro the user picks in the routine's own
 option: an option whose `choices:` are macro names, plus `none` to leave the step out. `{option}`
