@@ -71,7 +71,9 @@ object RunSummary {
     /** The outcome of a routine: each step's result, then everything its steps got. */
     fun ofRoutine(routine: String, steps: List<RunStats.Record>, missing: List<String>, end: String, ms: Long,
                   /** The steps skipped after a required step failed ([Routine]), and why. */
-                  skipped: List<String> = emptyList(), skipping: String? = null): Outcome {
+                  skipped: List<String> = emptyList(), skipping: String? = null,
+                  /** The steps the user switched off ([Routine.switchKey]). */
+                  off: List<String> = emptyList()): Outcome {
         val bad = steps.filter { it.outcome != RunStats.Outcome.DONE }
         val name = pretty(routine)
         val title = when {
@@ -86,6 +88,7 @@ object RunSummary {
             ?: "unknown macro (update the macros)")
         if (end.startsWith("safety stop")) lines += "The remaining steps were skipped after the safety stop."
         if (skipping != null && skipped.isNotEmpty()) lines += "Skipped (${skipping}): " + skipped.joinToString { pretty(it) }
+        if (off.isNotEmpty()) lines += "Skipped (off): " + off.joinToString { pretty(it) }
         for (s in bad.filter { it.outcome != RunStats.Outcome.STOPPED }) {
             lines += "${pretty(s.macro)} — " + where(s).removePrefix("Where: ")
             s.shot?.let { lines += shotLine(it) }

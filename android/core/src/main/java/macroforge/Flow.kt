@@ -61,6 +61,14 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
         val type = m?.get("type")?.toString() ?: if (default is Boolean) "bool" else "text"
         k.toString() to Param(Expr.str(default), m?.get("help")?.toString() ?: "", choices, type, m?.get("show_if")?.toString(),
             beside = m?.get("beside")?.toString(), global = global)
+    }.let { declared ->
+        // a routine gets one switch per step, "Include <step>" (see [Routine.switchKey]), unless it declares that option itself
+        val switches = LinkedHashMap<String, Param>()
+        for (rs in parseRoutineSteps(spec)) {
+            val key = Routine.switchKey(rs.macro)
+            if (key !in declared && key !in switches) switches[key] = Param("true", "Include ${rs.macro.trim('{', '}', ' ')}", type = "bool")
+        }
+        declared + switches
     }
     /**
      * The options taken over from the macros it runs (battle.skill_1, ...): set by [InnerParams.link]
@@ -75,10 +83,7 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
      * can also be {macro, params}: the macro, or "{option}" for the one picked in the routine's
      * option, with options for it ("{option}" in a value: that option's value); see [Routine.fill].
      */
-    val routineSteps: List<RoutineStep> = list(spec["steps"]).map { s ->
-        mapOrNull(s)?.let { m -> RoutineStep(m["macro"].toString(), map(m["params"]).entries.associate { (k, v) -> k to Expr.str(v) }) }
-            ?: RoutineStep(s.toString(), emptyMap())
-    }
+    val routineSteps: List<RoutineStep> = parseRoutineSteps(spec)
     /** The routine's steps by macro name (as written: "{option}" for a picked one). */
     val steps: List<String> = routineSteps.map { it.macro }
     /**
@@ -94,6 +99,10 @@ class FlowScenario(val spec: Map<String, Any?>, val source: String,
     val screenDefs: Map<String, ScreenDef> = map(spec["define_screens"]).entries.associate { (k, v) ->
         val m = mapOrNull(v)
         k.toString() to ScreenDef(k.toString(), list(m?.get("require")).map { it.toString() }, list(m?.get("reject")).map { it.toString() })
+    }
+    private fun parseRoutineSteps(spec: Map<String, Any?>): List<RoutineStep> = list(spec["steps"]).map { s ->
+        mapOrNull(s)?.let { m -> RoutineStep(m["macro"].toString(), map(m["params"]).entries.associate { (k, v) -> k to Expr.str(v) }) }
+            ?: RoutineStep(s.toString(), emptyMap())
     }
     private val handlers = map(spec["handlers"]).entries.associate { (k, v) -> k.toString() to list(v) }
 

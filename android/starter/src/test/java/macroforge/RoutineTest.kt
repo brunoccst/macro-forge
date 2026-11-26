@@ -42,6 +42,21 @@ class RoutineTest {
         assertEquals(mapOf("fast" to "true"), r.routineSteps[1].params)
     }
 
+    @Test fun everyStepHasAnIncludeSwitchThatDefaultsToOn() {
+        val r = FlowScenario(mapOf("name" to "r", "params" to mapOf("include_b" to mapOf("default" to false, "help" to "own")),
+            "steps" to listOf("a", "b", "{boss}", "a", mapOf("macro" to "{boss}"))), "r")
+        // one switch per step (a repeated step shares it), the routine's own declaration wins
+        assertEquals(setOf("include_b", "include_a", "include_boss"), r.params.keys)
+        assertEquals("true", r.params.getValue("include_a").default)
+        assertTrue(r.params.getValue("include_a").isBool)
+        assertEquals("false", r.params.getValue("include_b").default)
+        val a = RoutineStep("a", emptyMap())
+        assertFalse(Routine.isOff(a, mapOf("include_a" to "true")))
+        assertFalse(Routine.isOff(a, emptyMap()))
+        assertTrue(Routine.isOff(a, mapOf("include_a" to "false")))
+        assertTrue(Routine.isOff(RoutineStep("{boss}", emptyMap()), mapOf("include_boss" to "false")))
+    }
+
     @Test fun theOutcomeSaysWhatWasSkipped() {
         val steps = listOf(
             RunStats.Record("start-game", 0L, 180_000L, "stuck on an unrecognised screen for 180s", routine = "daily-routine"),

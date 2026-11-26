@@ -71,6 +71,7 @@ object MacroSteps {
         if (macro.steps.isNotEmpty()) return macro.routineSteps.map { rs ->
             val (name, given) = Routine.fill(rs, options)
                 ?: return@map Step(title(rs.macro.trim('{', '}', ' ')) + ": none picked, skipped", skipped = true)
+            if (Routine.isOff(rs, options)) return@map Step(title(name) + ": switched off, skipped (off)", skipped = true)
             val step = callStep(name, given, "", env, routine = given.isEmpty())
             val rule = when {
                 name in macro.required -> "if it fails, the rest is skipped" + if (macro.always.isEmpty()) "" else " but ${macro.always.joinToString()}"

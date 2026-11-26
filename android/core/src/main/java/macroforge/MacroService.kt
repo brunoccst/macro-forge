@@ -127,6 +127,7 @@ class MacroService : Service() {
             val results = ArrayList<String>()
             val missing = ArrayList<String>()
             val skipped = ArrayList<String>()
+            val switchedOff = ArrayList<String>()
             var skipping: String? = null
             // the routine's own options (defaults, globals): the steps picked in them and their options
             val options = Runner.resolve(flow, params)
@@ -136,6 +137,7 @@ class MacroService : Service() {
             try {
                 for ((i, routineStep) in flow.routineSteps.withIndex()) {
                     val picked = Routine.fill(routineStep, options)
+                    if (picked != null && Routine.isOff(routineStep, options)) { switchedOff += picked.first; results += "${picked.first}: skipped (off)"; continue }
                     if (picked == null) { results += "${routineStep.macro}: none picked"; continue }
                     val (step, given) = picked
                     if (!Routine.runs(step, skipping, flow.always)) { skipped += step; results += "$step: skipped ($skipping)"; continue }
@@ -176,7 +178,7 @@ class MacroService : Service() {
                         },
                         counts, steps.flatMap { it.reports }, items = items))
                     // one outcome message for the whole routine, after its last step
-                    RunSummary.finished(this, RunSummary.ofRoutine(scenario.name, steps, missing, routineEnd, end - routineStart, skipped, skipping), show = source != "connector")
+                    RunSummary.finished(this, RunSummary.ofRoutine(scenario.name, steps, missing, routineEnd, end - routineStart, skipped, skipping, switchedOff), show = source != "connector")
                 }.onFailure { MacroLog.e("could not save the routine's statistics", it) }
             }
             MacroLog.i("${scenario.name} done — " + results.joinToString(" | "))
