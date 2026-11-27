@@ -160,7 +160,7 @@ class MacroService : Service() {
                     if (Routine.recoversAfter(step, reason, Routine.skipAfter(step, reason, flow.required), recovery, i < flow.routineSteps.size - 1)) {
                         MacroLog.i("${scenario.name}: $step failed, running $recovery before the next step")
                         val recovered = try { Scenarios.get(this, recovery) } catch (e: Exception) { MacroLog.e(e.message ?: "unknown macro"); null }
-                        if (recovered != null) results += "$recovery (after $step): " + Runner.run(recovered, MacroParams.load(this, recovery), cap, this, source = source)
+                        if (recovered != null) results += "$recovery (after $step): " + Runner.run(recovered, MacroParams.load(this, recovery), cap, this, source = source, routine = scenario.name)
                     }
                     if (skipping == null) Routine.skipAfter(step, reason, flow.required)?.let {
                         skipping = it

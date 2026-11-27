@@ -521,7 +521,8 @@ object Runner {
         paused.set(false)
         current = scenario.name
         lastScreen = null
-        if (routine == null) RunSummary.hide()
+        // a card left over from an earlier run closes as soon as any macro starts (it would take the Back presses)
+        RunSummary.hide()
         changed()
         val files = MacroLibrary.files(app)
         val userTemplates = Scenarios.userTemplates(app)
