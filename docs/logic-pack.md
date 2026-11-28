@@ -44,6 +44,10 @@ a comment, means a new install.
   `FlowRun.STEPS`; one that knows the game goes in the game plugin (`actions`
   and `run`, its basic macros in `stepUses`, its "How it works" words in `explain`). `Entry`
   lists both. Macros that use it stop being "unsupported" as soon as the pack loads.
+- **Panning a map:** a macro step that reads a map larger than the screen uses
+  `logic/MapSweep.kt` (the corner first, then row by row until the view stops moving, drags only
+  inside a safe area, three different starts before an edge counts). It keeps its own text
+  matching so it ships with the pack.
 - **Generic logic never names game code.** `FlowRun`, `GamePlugin`, `Game` and `AdEscape` work for
   any game; a game app should test that they never use its own classes.
 - **Stored state:** the loaded pack lives in the app's files (`files/logic/current`). If it fails
